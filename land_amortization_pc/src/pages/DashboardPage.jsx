@@ -171,44 +171,62 @@ export function DashboardPage() {
       )}
 
       {/* Main Collection Progress Bar */}
-      <div className="glass-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TrendingUp size={16} color="var(--accent-emerald)" />
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Collection Progress
+      <div className="glass-card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 32,
+              height: 32,
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(16, 185, 129, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-emerald)'
+            }}>
+              <TrendingUp size={18} />
+            </div>
+            <div>
+              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Collection Progress
+              </span>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Amortized portfolio recovery rate</div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.4rem', color: 'var(--accent-emerald)', letterSpacing: '-0.02em' }}>
+              {(dashboard.collectionRate || 0).toFixed(1)}%
             </span>
           </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-emerald-light)' }}>
-            {(dashboard.collectionRate || 0).toFixed(1)}%
-          </span>
         </div>
 
         <div style={{
           width: '100%',
-          height: 10,
+          height: 12,
           backgroundColor: 'var(--bg-surface)',
           borderRadius: 99,
           overflow: 'hidden',
-          marginBottom: 10
+          marginBottom: 12,
+          border: '1px solid var(--border-subtle)'
         }}>
           <div style={{
             height: '100%',
             width: `${Math.min(100, dashboard.collectionRate || 0)}%`,
-            background: 'linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan))',
+            background: 'linear-gradient(90deg, #10b981, #06b6d4)',
             borderRadius: 99,
+            boxShadow: '0 0 12px rgba(16, 185, 129, 0.4)',
             transition: 'width 0.8s ease'
           }} />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-          <div>
-            <span style={{ color: 'var(--text-muted)' }}>Collected: </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(dashboard.totalCollected)}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card-subtle)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Collected: </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--accent-emerald)' }}>{formatCurrency(dashboard.totalCollected)}</span>
           </div>
-          <div>
-            <span style={{ color: 'var(--text-muted)' }}>Target: </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(dashboard.totalContractAmount)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card-subtle)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Target Portfolio: </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--text-primary)' }}>{formatCurrency(dashboard.totalContractAmount)}</span>
           </div>
         </div>
       </div>
@@ -249,30 +267,34 @@ export function DashboardPage() {
       <FinancialDonutChart dashboard={dashboard} />
 
       {/* Account Status Breakdown Grid */}
-      <div className="glass-card" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+      <div className="glass-card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: '0.84rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Account Status Distribution
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           <div
             onClick={() => setActiveTab('accounts')}
             style={{
               background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              borderRadius: 8,
-              padding: '10px 12px',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CheckCircle2 size={16} color="var(--accent-emerald)" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Active</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <CheckCircle2 size={18} color="var(--accent-emerald)" />
+              <div>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>Active</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>On track</span>
+              </div>
             </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-emerald-light)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.25rem', color: 'var(--accent-emerald)' }}>
               {dashboard.activeAccounts || 0}
             </span>
           </div>
@@ -281,20 +303,24 @@ export function DashboardPage() {
             onClick={() => setActiveTab('accounts')}
             style={{
               background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.2)',
-              borderRadius: 8,
-              padding: '10px 12px',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={16} color="var(--accent-amber)" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Overdue</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Clock size={18} color="var(--accent-amber)" />
+              <div>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>Overdue</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Past due date</span>
+              </div>
             </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-amber)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.25rem', color: 'var(--accent-amber)' }}>
               {dashboard.overdueAccounts || 0}
             </span>
           </div>
@@ -303,20 +329,24 @@ export function DashboardPage() {
             onClick={() => setActiveTab('accounts')}
             style={{
               background: 'rgba(244, 63, 94, 0.08)',
-              border: '1px solid rgba(244, 63, 94, 0.2)',
-              borderRadius: 8,
-              padding: '10px 12px',
+              border: '1px solid rgba(244, 63, 94, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldAlert size={16} color="var(--accent-rose)" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>2+ Missed (10%)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <ShieldAlert size={18} color="var(--accent-rose)" />
+              <div>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>2+ Missed</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>10% penalty</span>
+              </div>
             </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-rose)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.25rem', color: 'var(--accent-rose)' }}>
               {dashboard.twoPlusMissed || 0}
             </span>
           </div>
@@ -325,20 +355,24 @@ export function DashboardPage() {
             onClick={() => setActiveTab('accounts')}
             style={{
               background: 'rgba(234, 88, 12, 0.08)',
-              border: '1px solid rgba(234, 88, 12, 0.2)',
-              borderRadius: 8,
-              padding: '10px 12px',
+              border: '1px solid rgba(234, 88, 12, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={16} color="#fb923c" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>DP Overdue</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertTriangle size={18} color="#fb923c" />
+              <div>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>DP Overdue</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pending DP</span>
+              </div>
             </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: '#fb923c' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.25rem', color: '#fb923c' }}>
               {dashboard.downPaymentsOverdue || 0}
             </span>
           </div>
@@ -417,26 +451,26 @@ export function DashboardPage() {
       <MonthlyCollectionsChart payments={payments} />
 
       {/* Penalties Summary Box */}
-      <div className="glass-card" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+      <div className="glass-card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: '0.84rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Penalties Breakdown
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>DP Penalty (1%)</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginTop: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>DP Penalty (1%)</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: 4 }}>
               {formatCurrency(dashboard.dpPenalties)}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>10% Penalties</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginTop: 4 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>10% Penalties</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: 4 }}>
               {formatCurrency(dashboard.tenPercentPenalties)}
             </div>
           </div>
-          <div style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: '#fb7185' }}>Total Penalties</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: '#fb7185', marginTop: 4 }}>
+          <div style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.25)', padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.72rem', color: '#fb7185', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Cumulative Penalties</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '1.15rem', color: '#fb7185', marginTop: 4 }}>
               {formatCurrency(dashboard.totalPenalties)}
             </div>
           </div>

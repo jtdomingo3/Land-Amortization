@@ -141,13 +141,7 @@ export function SchedulePage() {
       </div>
 
       {/* Filter Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: 6,
-        marginBottom: 12,
-        overflowX: 'auto',
-        paddingBottom: 4
-      }}>
+      <div className="status-filter-row" style={{ marginBottom: 16 }}>
         {[
           { id: 'ALL', label: `All (${schedule.length})` },
           { id: 'PAID', label: 'Paid' },
@@ -158,18 +152,7 @@ export function SchedulePage() {
           <button
             key={filter.id}
             onClick={() => setStatusFilter(filter.id)}
-            style={{
-              background: statusFilter === filter.id ? 'var(--accent-emerald)' : 'var(--bg-card)',
-              color: statusFilter === filter.id ? '#000' : 'var(--text-secondary)',
-              border: '1px solid',
-              borderColor: statusFilter === filter.id ? 'var(--accent-emerald)' : 'var(--border-subtle)',
-              borderRadius: 99,
-              padding: '4px 12px',
-              fontSize: '0.74rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
+            className={`filter-pill ${statusFilter === filter.id ? 'active' : ''}`}
           >
             {filter.label}
           </button>
