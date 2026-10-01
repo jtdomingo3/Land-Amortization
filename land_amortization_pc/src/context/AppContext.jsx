@@ -18,6 +18,12 @@ import { computeAccountDerived, computePaymentDerived } from '../engine/calculat
 import { computeDashboard } from '../engine/dashboard.js';
 import { saveWorkbookToDevice } from '../export/excelExport.js';
 import { shareToGoogleDrive } from '../share/shareFile.js';
+import {
+  syncUpsertAccount,
+  syncDeleteAccount,
+  syncUpsertPayment,
+  syncDeletePayment
+} from '../services/supabaseSync.js';
 
 const AppContext = createContext(null);
 
@@ -132,10 +138,11 @@ export function AppProvider({ children }) {
   // CRUD Actions
   const handleAddAccount = async (accountData) => {
     await insertAccount(accountData);
+    syncUpsertAccount(accountData); // Auto-sync to cloud if online
 
     // If down payment is marked as paid upfront, automatically create initial Down Payment payment record
     if (Number(accountData.is_dp_paid) === 1 && Number(accountData.down_payment) > 0) {
-      await insertPayment({
+      const dpPayment = {
         account_id: accountData.account_id,
         payment_date: accountData.date_of_start || toISODateString(new Date()),
         payment_type: 'Down Payment',
@@ -143,7 +150,9 @@ export function AppProvider({ children }) {
         receipt_no: `DP-${accountData.account_id}`,
         payment_method: 'Cash',
         remarks: 'Initial Down Payment'
-      });
+      };
+      await insertPayment(dpPayment);
+      syncUpsertPayment(dpPayment);
     }
 
     await refreshData();
@@ -151,16 +160,19 @@ export function AppProvider({ children }) {
 
   const handleUpdateAccount = async (accountData) => {
     await dbUpdateAccount(accountData);
+    syncUpsertAccount(accountData);
     await refreshData();
   };
 
   const handleDeleteAccount = async (accountId) => {
     await dbDeleteAccount(accountId);
+    syncDeleteAccount(accountId);
     await refreshData();
   };
 
   const handleAddPayment = async (paymentData) => {
     await insertPayment(paymentData);
+    syncUpsertPayment(paymentData);
 
     // If payment is a Down Payment, recompute and reduce monthly amortization on the account
     if (paymentData.payment_type === 'Down Payment') {
@@ -176,11 +188,13 @@ export function AppProvider({ children }) {
         const months = Number(acc.num_of_months) || 120;
         const newMonthly = Number((Math.max(0, contract - newTotalDpPaid) / months).toFixed(2));
 
-        await dbUpdateAccount({
+        const updatedAcc = {
           ...acc,
           monthly_amortization: newMonthly,
           is_dp_paid: 1
-        });
+        };
+        await dbUpdateAccount(updatedAcc);
+        syncUpsertAccount(updatedAcc);
       }
     }
 
@@ -189,12 +203,14 @@ export function AppProvider({ children }) {
 
   const handleUpdatePayment = async (paymentData) => {
     await dbUpdatePayment(paymentData);
+    syncUpsertPayment(paymentData);
     await refreshData();
   };
 
   const handleDeletePayment = async (paymentId) => {
     const paymentToDelete = rawPayments.find(p => p.payment_id === paymentId);
     await dbDeletePayment(paymentId);
+    syncDeletePayment(paymentId);
 
     if (paymentToDelete && paymentToDelete.payment_type === 'Down Payment') {
       const acc = rawAccounts.find(a => String(a.account_id) === String(paymentToDelete.account_id));
@@ -208,11 +224,13 @@ export function AppProvider({ children }) {
         const isPaid = remainingDpPaid >= (Number(acc.down_payment) || 0) && remainingDpPaid > 0;
         const newMonthly = Number((Math.max(0, contract - remainingDpPaid) / months).toFixed(2));
 
-        await dbUpdateAccount({
+        const updatedAcc = {
           ...acc,
           monthly_amortization: newMonthly,
           is_dp_paid: isPaid ? 1 : 0
-        });
+        };
+        await dbUpdateAccount(updatedAcc);
+        syncUpsertAccount(updatedAcc);
       }
     }
 
