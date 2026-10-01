@@ -176,12 +176,25 @@ function setupIpcHandlers() {
 }
 
 function createWindow() {
+  const devIconPath = path.join(__dirname, '../public/logo.png');
+  const prodIconPath = path.join(app.getAppPath(), 'dist/logo.png');
+  const fallbackIcon = path.join(__dirname, '../src/assets/logo.png');
+  let appIcon = devIconPath;
+  if (fs.existsSync(devIconPath)) {
+    appIcon = devIconPath;
+  } else if (fs.existsSync(prodIconPath)) {
+    appIcon = prodIconPath;
+  } else if (fs.existsSync(fallbackIcon)) {
+    appIcon = fallbackIcon;
+  }
+
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 880,
     minWidth: 1024,
     minHeight: 680,
     title: 'Land Amortization Tracker',
+    icon: appIcon,
     backgroundColor: '#f8fafc',
     show: false,
     webPreferences: {

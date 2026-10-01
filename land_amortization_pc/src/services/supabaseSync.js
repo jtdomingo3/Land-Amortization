@@ -9,7 +9,19 @@ import {
 } from '../db/database.js';
 
 const SUPABASE_CONFIG_STORAGE_KEY = 'land_amortization_supabase_config';
-const DEFAULT_API_KEY = '';
+
+// Supabase Project Configuration (loaded safely from local .env)
+export const ENV_SUPABASE_URL =
+  (typeof import.meta !== 'undefined' &&
+    import.meta.env &&
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL)) ||
+  '';
+
+export const ENV_SUPABASE_KEY =
+  (typeof import.meta !== 'undefined' &&
+    import.meta.env &&
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY)) ||
+  '';
 
 /**
  * Get Supabase Configuration from localStorage or fallback defaults
@@ -20,9 +32,9 @@ export function getSupabaseConfig() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        url: parsed.url || '',
-        key: parsed.key || DEFAULT_API_KEY,
-        autoSync: Boolean(parsed.autoSync),
+        url: parsed.url || ENV_SUPABASE_URL,
+        key: parsed.key || ENV_SUPABASE_KEY,
+        autoSync: parsed.autoSync !== undefined ? Boolean(parsed.autoSync) : true,
         lastSyncedAt: parsed.lastSyncedAt || null
       };
     }
@@ -31,9 +43,9 @@ export function getSupabaseConfig() {
   }
 
   return {
-    url: '',
-    key: DEFAULT_API_KEY,
-    autoSync: false,
+    url: ENV_SUPABASE_URL,
+    key: ENV_SUPABASE_KEY,
+    autoSync: true,
     lastSyncedAt: null
   };
 }
@@ -96,7 +108,7 @@ export async function testSupabaseConnection() {
   if (!config.url) {
     return {
       success: false,
-      message: 'Supabase URL is not configured. Please enter your Supabase project URL in Settings.'
+      message: 'Supabase URL is not configured. Please verify your Supabase project URL in Settings.'
     };
   }
 
@@ -109,14 +121,12 @@ export async function testSupabaseConnection() {
   }
 
   try {
-    // Try to query accounts table or system health
-    const { data, error } = await client
+    const { error } = await client
       .from('land_accounts')
       .select('account_id')
       .limit(1);
 
     if (error) {
-      // Table might not exist yet or permissions need setup
       if (error.code === '42P01') {
         return {
           success: false,
@@ -186,13 +196,13 @@ CREATE INDEX IF NOT EXISTS idx_land_payments_account ON land_payments(account_id
 ALTER TABLE land_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE land_payments ENABLE ROW LEVEL SECURITY;
 
--- Allow anonymous access for the app key
+-- Allow read/write access for the app key
 CREATE POLICY "Allow all operations for land_accounts" ON land_accounts FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all operations for land_payments" ON land_payments FOR ALL USING (true) WITH CHECK (true);
 `;
 
 /**
- * Synchronize local SQLite / Web data with Supabase Cloud
+ * Full Synchronize local SQLite / Web data with Supabase Cloud
  */
 export async function syncWithSupabase() {
   const config = getSupabaseConfig();
@@ -233,8 +243,6 @@ export async function syncWithSupabase() {
       throw new Error(`Failed to fetch cloud payments: ${payErr.message}`);
     }
 
-    let pushedAccounts = 0;
-    let pushedPayments = 0;
     let pulledAccounts = 0;
     let pulledPayments = 0;
 
@@ -264,7 +272,6 @@ export async function syncWithSupabase() {
       if (upsertAccErr) {
         throw new Error(`Error uploading accounts to cloud: ${upsertAccErr.message}`);
       }
-      pushedAccounts = cleanAccs.length;
     }
 
     // 4. Push local payments to cloud (upsert)
@@ -288,10 +295,9 @@ export async function syncWithSupabase() {
       if (upsertPayErr) {
         throw new Error(`Error uploading payments to cloud: ${upsertPayErr.message}`);
       }
-      pushedPayments = cleanPays.length;
     }
 
-    // 5. Pull cloud accounts that don't exist locally or need update
+    // 5. Pull cloud accounts that don't exist locally
     const localAccIds = new Set(localAccounts.map(a => String(a.account_id)));
     for (const remAcc of (remoteAccounts || [])) {
       if (!localAccIds.has(String(remAcc.account_id))) {
@@ -314,7 +320,7 @@ export async function syncWithSupabase() {
 
     return {
       success: true,
-      message: `Cloud sync successful! Synced ${localAccounts.length} accounts and ${localPayments.length} payments. (Pulled ${pulledAccounts} accounts, ${pulledPayments} payments from cloud).`,
+      message: `Cloud sync complete! ${localAccounts.length} accounts & ${localPayments.length} payments synced.`,
       timestamp: now
     };
   } catch (err) {
@@ -323,5 +329,96 @@ export async function syncWithSupabase() {
       success: false,
       message: err.message
     };
+  }
+}
+
+/**
+ * Automatically sync a created/updated account to Supabase if online
+ */
+export async function syncUpsertAccount(account) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    const clean = {
+      account_id: account.account_id,
+      name: account.name,
+      date_of_start: account.date_of_start,
+      first_due_date: account.first_due_date,
+      land_title_number: account.land_title_number || null,
+      land_area_sqm: account.land_area_sqm || null,
+      total_contract_amount: account.total_contract_amount,
+      down_payment: account.down_payment || 0,
+      is_dp_paid: account.is_dp_paid || 0,
+      agreed_dp_due: account.agreed_dp_due || null,
+      monthly_amortization: account.monthly_amortization,
+      num_of_months: account.num_of_months,
+      remarks: account.remarks || null,
+      updated_at: new Date().toISOString()
+    };
+    await client.from('land_accounts').upsert(clean, { onConflict: 'account_id' });
+    console.log('[Cloud Sync] Auto-synced account to Supabase:', account.account_id);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-sync account deferred:', err.message);
+  }
+}
+
+/**
+ * Automatically delete an account from Supabase if online
+ */
+export async function syncDeleteAccount(accountId) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    await client.from('land_accounts').delete().eq('account_id', accountId);
+    console.log('[Cloud Sync] Auto-deleted account from Supabase:', accountId);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-delete account deferred:', err.message);
+  }
+}
+
+/**
+ * Automatically sync a created/updated payment to Supabase if online
+ */
+export async function syncUpsertPayment(payment) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    const clean = {
+      payment_id: payment.payment_id,
+      account_id: payment.account_id,
+      payment_date: payment.payment_date,
+      payment_type: payment.payment_type,
+      amount_paid: payment.amount_paid,
+      receipt_no: payment.receipt_no || null,
+      payment_method: payment.payment_method || 'Cash',
+      remarks: payment.remarks || null,
+      updated_at: new Date().toISOString()
+    };
+    await client.from('land_payments').upsert(clean, { onConflict: 'payment_id' });
+    console.log('[Cloud Sync] Auto-synced payment to Supabase:', payment.payment_id);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-sync payment deferred:', err.message);
+  }
+}
+
+/**
+ * Automatically delete a payment from Supabase if online
+ */
+export async function syncDeletePayment(paymentId) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    await client.from('land_payments').delete().eq('payment_id', paymentId);
+    console.log('[Cloud Sync] Auto-deleted payment from Supabase:', paymentId);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-delete payment deferred:', err.message);
   }
 }

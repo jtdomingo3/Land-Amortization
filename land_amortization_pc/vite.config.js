@@ -5,6 +5,7 @@ import renderer from 'vite-plugin-electron-renderer';
 
 // https://vite.dev/config/
 export default defineConfig({
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [
     react(),
     electron([
