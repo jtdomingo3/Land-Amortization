@@ -5,7 +5,6 @@ import { getFileNamePresets } from '../export/excelExport.js';
 import {
   CloudUpload,
   Download,
-  Share2,
   FileSpreadsheet,
   CheckCircle2,
   ShieldCheck,
@@ -22,7 +21,6 @@ import {
 } from 'lucide-react';
 import { GoogleDriveModal } from '../components/GoogleDriveModal.jsx';
 import { getGoogleDriveConfig, openGoogleDriveFolder } from '../services/googleDriveService.js';
-import { shareToOtherApps } from '../share/shareFile.js';
 
 export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
   const {
@@ -51,21 +49,6 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
     // Open the Google Drive setup modal so the user can easily review the folder link,
     // ensure "Anyone with the link" is enabled, and tap "Save to Google Drive Now"
     setIsDriveModalOpen(true);
-  };
-
-  const handleNativeShare = async () => {
-    try {
-      setLoadingAction('share_apps');
-      setSuccessMessage('');
-      setErrorMessage('');
-      const res = await shareToOtherApps(accounts, payments, exportFileName);
-      setLastExport(res);
-      setSuccessMessage(res.message || 'Share options opened.');
-    } catch (err) {
-      setErrorMessage(err.message || 'Failed to open share menu');
-    } finally {
-      setLoadingAction(null);
-    }
   };
 
   const handleSaveToDevice = async () => {
@@ -367,16 +350,6 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
             )}
           </div>
         </div>
-
-        <button
-          className="btn btn-ghost btn-block"
-          style={{ padding: '10px', fontSize: '0.84rem', color: 'var(--text-secondary)' }}
-          onClick={handleNativeShare}
-          disabled={loadingAction !== null}
-        >
-          <Share2 size={16} />
-          {loadingAction === 'share_apps' ? 'Opening Share Menu...' : 'Or Share via Other Apps (WhatsApp, Email...)'}
-        </button>
       </div>
 
       {/* Where is my file saved card - shown after export */}

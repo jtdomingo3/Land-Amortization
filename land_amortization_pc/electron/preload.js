@@ -18,5 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   app: {
     getPath: (name) => ipcRenderer.invoke('app:getPath', name)
+  },
+  print: {
+    printHtml: (html, options) => ipcRenderer.invoke('print:html', html, options),
+    toPdf: (html, options) => ipcRenderer.invoke('print:toPdf', html, options)
   }
 });

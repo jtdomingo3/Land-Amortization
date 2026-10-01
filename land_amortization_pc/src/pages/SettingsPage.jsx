@@ -94,7 +94,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   };
 
   const handleLoadSample = async () => {
-    if (confirm('Load default company details (CORTEZ LAND AMORTIZATION COLLECTION TRACKER)? Any unsaved edits will be replaced.')) {
+    if (confirm('Load default company details from environment configuration? Any unsaved edits will be replaced.')) {
       try {
         const sample = await loadSampleCompany(true);
         setForm(sample);
@@ -253,7 +253,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={handleLoadSample}
-          title="Reset to default Cortez Land details"
+          title="Reset to default company configuration"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <Sparkles size={14} color="var(--accent-cyan)" />
@@ -303,7 +303,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
               className="form-input"
               value={form.company_name}
               onChange={e => handleChange('company_name', e.target.value)}
-              placeholder="e.g. CORTEZ LAND AMORTIZATION COLLECTION TRACKER"
+              placeholder="e.g. Acme Land Development & Realty"
               required
             />
           </div>
@@ -315,7 +315,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
               className="form-input"
               value={form.company_address}
               onChange={e => handleChange('company_address', e.target.value)}
-              placeholder="e.g. Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte"
+              placeholder="e.g. 123 Business Avenue, Suite 400, Metro City"
             />
           </div>
 
@@ -327,7 +327,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.company_contact}
                 onChange={e => handleChange('company_contact', e.target.value)}
-                placeholder="e.g. 0935-3551416"
+                placeholder="e.g. (02) 8123-4567 / 0917-000-0000"
               />
             </div>
 
@@ -338,7 +338,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.company_email}
                 onChange={e => handleChange('company_email', e.target.value)}
-                placeholder="e.g. artjrbarbasa@yahoo.com"
+                placeholder="e.g. info@company.com"
               />
             </div>
           </div>
@@ -451,7 +451,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.signatory_name}
                 onChange={e => handleChange('signatory_name', e.target.value)}
-                placeholder="e.g. ARTEMIO TEDOCO-BARBASA"
+                placeholder="e.g. Juan Dela Cruz, CPA"
               />
             </div>
 

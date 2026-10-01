@@ -11,17 +11,18 @@ import { computeMonthlySchedule } from '../engine/waterfall.js';
  * @returns {string} Full A4 HTML string
  */
 export function generateSOAHTML(account, payments = [], options = {}) {
+  const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
   const company = options.company || {};
-  const companyName = company.company_name || 'CORTEZ LAND AMORTIZATION COLLECTION TRACKER';
-  const companyAddress = company.company_address || 'Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte';
-  const companyContact = company.company_contact || '';
-  const companyEmail = company.company_email || '';
-  const companyTin = company.company_tin || '';
-  const companyLogo = company.company_logo || '';
+  const companyName = company.company_name || env.VITE_COMPANY_NAME || 'Land Amortization Tracker';
+  const companyAddress = company.company_address || env.VITE_COMPANY_ADDRESS || '';
+  const companyContact = company.company_contact || env.VITE_COMPANY_CONTACT || '';
+  const companyEmail = company.company_email || env.VITE_COMPANY_EMAIL || '';
+  const companyTin = company.company_tin || env.VITE_COMPANY_TIN || '';
+  const companyLogo = company.company_logo || env.VITE_COMPANY_LOGO || '';
 
-  const signatoryName = company.signatory_name || '';
-  const signatoryTitle = company.signatory_title || '';
-  const signatoryEsig = company.signatory_esig || '';
+  const signatoryName = company.signatory_name || env.VITE_SIGNATORY_NAME || '';
+  const signatoryTitle = company.signatory_title || env.VITE_SIGNATORY_TITLE || 'Approved by';
+  const signatoryEsig = company.signatory_esig || env.VITE_SIGNATORY_ESIG || '';
 
   const contactLine = [
     companyContact ? `Tel: ${companyContact}` : '',
@@ -318,12 +319,12 @@ export function generateSOAHTML(account, payments = [], options = {}) {
             ${signatoryEsig ? `
               <div class="doc-sig-container">
                 <img class="doc-sig-image" src="${signatoryEsig}" alt="Signature" />
-                <div class="doc-sig-name">${signatoryName || 'ARTEMIO TEDOCO-BARBASA'}</div>
+                <div class="doc-sig-name">${signatoryName || 'Authorized Signatory'}</div>
               </div>
             ` : `
               <div class="doc-sig-buyer-container">
                 <div class="doc-sig-line"></div>
-                <div class="doc-sig-name">${signatoryName || 'ARTEMIO TEDOCO-BARBASA'}</div>
+                <div class="doc-sig-name">${signatoryName || 'Authorized Signatory'}</div>
               </div>
             `}
             <div class="doc-sig-title">${signatoryTitle || 'Approved by'}</div>

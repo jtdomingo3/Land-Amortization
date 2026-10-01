@@ -2,12 +2,13 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 /**
- * Print & PDF Sharing Service for Receipts and Statement of Account (SOA).
+ * Print & PDF Export Service for Receipts and Statement of Account (SOA).
  * 
- * Works seamlessly across:
- * - Android Cordova WebView: Generates PDF, saves to Documents/Amortization Tracker,
- *   and launches native Share sheet (Drive, WhatsApp, Viber, Messenger, Bluetooth, Print).
- * - Web Browsers: Generates PDF and downloads it, or triggers browser window.print().
+ * Specifically adapted for Windows Desktop PC (Electron):
+ * - Native desktop printing: Bypasses the broken Chromium print preview, invokes
+ *   the system printer dialog directly without UI freezing or blank screens.
+ * - Native PDF saving: Uses Electron's vector-crisp printToPDF and native Windows file dialog.
+ * - Browser Fallback: Generates high-DPI PDF via jsPDF & html2canvas or hidden iframe.
  */
 
 /**
@@ -99,63 +100,109 @@ export async function generatePdfBlobFromHtml(htmlContent, documentTitle = 'Docu
 }
 
 /**
- * Save PDF to device and trigger Android native share menu or browser download.
+ * Direct print document to printer.
+ * On Electron PC: uses native print:html (silent: false) which opens the Windows OS
+ * printer selection dialog directly without Chromium's broken print preview.
  */
-export async function shareOrSavePdf(htmlContent, documentTitle = 'Document') {
+export async function printDocument(htmlContent, documentTitle = 'Document', options = {}) {
+  // 1. Electron Desktop Native Print
+  if (typeof window !== 'undefined' && window.electronAPI?.print?.printHtml) {
+    try {
+      const res = await window.electronAPI.print.printHtml(htmlContent, {
+        title: documentTitle,
+        silent: options.silent || false
+      });
+      return res;
+    } catch (err) {
+      console.error('[PrintService] Electron native print error:', err);
+    }
+  }
+
+  // 2. Browser Fallback: Clean hidden iframe print
+  return new Promise((resolve) => {
+    try {
+      let iframe = document.getElementById('silent-print-frame');
+      if (iframe) {
+        iframe.remove();
+      }
+      iframe = document.createElement('iframe');
+      iframe.id = 'silent-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${documentTitle}</title>
+            <style>
+              @page { size: auto; margin: 10mm; }
+              body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.warn('Iframe print error:', e);
+        }
+        setTimeout(() => {
+          iframe.remove();
+          resolve({ success: true });
+        }, 1500);
+      }, 300);
+    } catch (err) {
+      console.error('Browser print fallback failed:', err);
+      resolve({ success: false, error: err.message });
+    }
+  });
+}
+
+/**
+ * Save Document as PDF directly to disk.
+ * On Electron: uses vector-sharp printToPDF and native Windows save dialog.
+ * On Browser: uses jsPDF + html2canvas and browser downloads.
+ */
+export async function saveDocumentAsPdf(htmlContent, documentTitle = 'Document') {
   const sanitizedTitle = (documentTitle || 'Document').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  // 1. Electron Native PDF Export
+  if (typeof window !== 'undefined' && window.electronAPI?.print?.toPdf) {
+    try {
+      const res = await window.electronAPI.print.toPdf(htmlContent, {
+        title: sanitizedTitle,
+        dialogTitle: `Save ${documentTitle} as PDF`
+      });
+      if (res.canceled) {
+        return { success: false, canceled: true, message: 'Export canceled by user.' };
+      }
+      if (res.success) {
+        return { success: true, filePath: res.filePath, fileName: res.fileName, message: `Successfully saved to ${res.fileName}` };
+      }
+    } catch (err) {
+      console.warn('[PrintService] Electron native PDF failed, falling back to jsPDF:', err);
+    }
+  }
+
+  // 2. Web / Browser fallback with jsPDF
+  const { pdfBlob } = await generatePdfBlobFromHtml(htmlContent, documentTitle);
   const fileName = `${sanitizedTitle}.pdf`;
 
-  // 1. Generate PDF Blob and PDF instance
-  const { pdfBlob, pdf } = await generatePdfBlobFromHtml(htmlContent, documentTitle);
-
-  // 2. Extract base64 for SocialSharing
-  let shareTarget = null;
-  try {
-    const dataUri = pdf.output('datauristring');
-    const commaIdx = dataUri.indexOf(',');
-    if (commaIdx !== -1) {
-      const rawBase64 = dataUri.substring(commaIdx + 1);
-      shareTarget = `df:${fileName};data:application/pdf;base64,${rawBase64}`;
-    }
-  } catch (encErr) {
-    console.warn('Failed to encode PDF for sharing:', encErr);
-  }
-
-  // 3. Cordova Android Native Share Sheet
-  const socialSharing = typeof window !== 'undefined' && (window.plugins?.socialsharing || window.SocialSharing);
-  if (socialSharing && shareTarget) {
-    // Also save a background copy to Documents/Amortization Tracker if cordova file is ready
-    try {
-      if (window.cordova?.file?.externalRootDirectory && window.resolveLocalFileSystemURL) {
-        window.resolveLocalFileSystemURL(window.cordova.file.externalRootDirectory, (rootEntry) => {
-          rootEntry.getDirectory('Documents', { create: true, exclusive: false }, (docsEntry) => {
-            docsEntry.getDirectory('Amortization Tracker', { create: true, exclusive: false }, (trackerEntry) => {
-              trackerEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
-                fileEntry.createWriter((writer) => writer.write(pdfBlob), () => {});
-              }, () => {});
-            }, () => {});
-          }, () => {});
-        }, () => {});
-      }
-    } catch (saveErr) {
-      console.warn('Background copy error (non-fatal):', saveErr);
-    }
-
-    return new Promise((resolve) => {
-      socialSharing.shareWithOptions({
-        message: `${documentTitle} - Cortez Land Amortization`,
-        subject: documentTitle,
-        files: [shareTarget],
-        chooserTitle: 'Share / Save PDF via...'
-      }, (res) => {
-        resolve({ success: true, message: 'Share sheet opened successfully.', filePath: fileName });
-      }, (err) => {
-        resolve({ success: true, message: 'Share sheet dismissed or closed.', filePath: fileName });
-      });
-    });
-  }
-
-  // 3. Web Browser Fallback: Automatic download of PDF
   const url = URL.createObjectURL(pdfBlob);
   const a = document.createElement('a');
   a.href = url;
@@ -169,47 +216,9 @@ export async function shareOrSavePdf(htmlContent, documentTitle = 'Document') {
 }
 
 /**
- * Desktop browser print preview (window.print).
- * If on Cordova Android where window.print is non-functional, automatically delegates to shareOrSavePdf.
+ * Backward-compatible wrapper for previous shareOrSavePdf callers.
+ * Desktop app drops the share intent sheet and saves PDF directly.
  */
-export async function printDocument(htmlContent, documentTitle = 'Receipt') {
-  if (typeof window !== 'undefined' && window.cordova) {
-    // Android Cordova WebView does not support window.print() reliably
-    return shareOrSavePdf(htmlContent, documentTitle);
-  }
-
-  return new Promise((resolve) => {
-    let printArea = document.getElementById('print-area');
-    if (!printArea) {
-      printArea = document.createElement('div');
-      printArea.id = 'print-area';
-      document.body.appendChild(printArea);
-    }
-
-    const previousTitle = document.title;
-    if (documentTitle) {
-      document.title = documentTitle;
-    }
-
-    printArea.innerHTML = htmlContent;
-
-    setTimeout(() => {
-      const cleanup = () => {
-        printArea.innerHTML = '';
-        document.title = previousTitle;
-        window.removeEventListener('afterprint', cleanup);
-        resolve(true);
-      };
-
-      window.addEventListener('afterprint', cleanup);
-
-      try {
-        window.print();
-      } catch (err) {
-        console.error('Error invoking window.print():', err);
-      }
-
-      setTimeout(cleanup, 2000);
-    }, 150);
-  });
+export async function shareOrSavePdf(htmlContent, documentTitle = 'Document') {
+  return saveDocumentAsPdf(htmlContent, documentTitle);
 }

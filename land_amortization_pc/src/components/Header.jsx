@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.jsx';
-import { Share2, Sun, Moon, RotateCw, Cloud, HardDrive, Bell } from 'lucide-react';
+import { Download, Sun, Moon, RotateCw, Cloud, HardDrive, Bell } from 'lucide-react';
 
 export function Header({ onSync, isSyncing, syncStatus }) {
   const { activeTab, setActiveTab, theme, toggleTheme, refreshData, loading } = useApp();
@@ -79,10 +79,10 @@ export function Header({ onSync, isSyncing, syncStatus }) {
         <button
           className="btn btn-primary btn-sm"
           onClick={() => setActiveTab('export')}
-          title="Export / Share to Excel & Drive"
+          title="Export Data & Backup to Excel"
         >
-          <Share2 size={15} />
-          <span className="btn-text">Export Report</span>
+          <Download size={15} />
+          <span className="btn-text">Export Excel</span>
         </button>
       </div>
     </header>

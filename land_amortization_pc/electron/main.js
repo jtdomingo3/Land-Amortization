@@ -173,6 +173,185 @@ function setupIpcHandlers() {
   ipcMain.handle('app:getPath', async (_event, name) => {
     return app.getPath(name);
   });
+
+  // Desktop Native Print (Bypasses broken Chromium print preview, invokes system print dialog)
+  ipcMain.handle('print:html', async (_event, htmlContent, options = {}) => {
+    return new Promise((resolve) => {
+      let printWin = null;
+      try {
+        printWin = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+          }
+        });
+
+        const fullHtml = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>${options.title || 'Print Document'}</title>
+              <style>
+                @page { size: auto; margin: 10mm; }
+                @media print {
+                  body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    background: #ffffff !important;
+                    color: #000000 !important;
+                  }
+                }
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                  background: #ffffff;
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>
+        `;
+
+        printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+
+        printWin.webContents.on('did-finish-load', () => {
+          setTimeout(() => {
+            if (!printWin || printWin.isDestroyed()) return;
+            printWin.webContents.print(
+              {
+                silent: options.silent || false,
+                printBackground: true,
+                deviceName: options.deviceName || ''
+              },
+              (success, failureReason) => {
+                try {
+                  if (printWin && !printWin.isDestroyed()) printWin.close();
+                } catch (_) {}
+                if (!success && failureReason !== 'Print job was cancelled') {
+                  resolve({ success: false, error: failureReason });
+                } else {
+                  resolve({ success: true, canceled: !success });
+                }
+              }
+            );
+          }, 250);
+        });
+
+        printWin.webContents.on('did-fail-load', () => {
+          try {
+            if (printWin && !printWin.isDestroyed()) printWin.close();
+          } catch (_) {}
+          resolve({ success: false, error: 'Failed to load document for printing.' });
+        });
+      } catch (err) {
+        if (printWin) {
+          try { if (!printWin.isDestroyed()) printWin.close(); } catch (_) {}
+        }
+        resolve({ success: false, error: err.message });
+      }
+    });
+  });
+
+  // Desktop Native Print to PDF (Vector-crisp PDF output via Electron native renderer)
+  ipcMain.handle('print:toPdf', async (_event, htmlContent, options = {}) => {
+    return new Promise((resolve) => {
+      let printWin = null;
+      try {
+        printWin = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+          }
+        });
+
+        const fullHtml = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>${options.title || 'Document'}</title>
+              <style>
+                @page { size: A4; margin: 10mm; }
+                @media print {
+                  body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    background: #ffffff !important;
+                  }
+                }
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>
+        `;
+
+        printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+
+        printWin.webContents.on('did-finish-load', () => {
+          setTimeout(async () => {
+            try {
+              if (!printWin || printWin.isDestroyed()) return;
+              const pdfBuffer = await printWin.webContents.printToPDF({
+                pageSize: options.pageSize || 'A4',
+                printBackground: true,
+                margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 }
+              });
+
+              try {
+                if (printWin && !printWin.isDestroyed()) printWin.close();
+              } catch (_) {}
+
+              const sanitizedTitle = (options.title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+              const defaultFileName = `${sanitizedTitle}.pdf`;
+
+              const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+                title: options.dialogTitle || 'Save Document as PDF',
+                defaultPath: defaultFileName,
+                filters: [{ name: 'PDF Documents (*.pdf)', extensions: ['pdf'] }]
+              });
+
+              if (canceled || !filePath) {
+                return resolve({ success: false, canceled: true });
+              }
+
+              await fs.promises.writeFile(filePath, pdfBuffer);
+              resolve({ success: true, filePath, fileName: path.basename(filePath) });
+            } catch (err) {
+              try {
+                if (printWin && !printWin.isDestroyed()) printWin.close();
+              } catch (_) {}
+              resolve({ success: false, error: err.message });
+            }
+          }, 250);
+        });
+
+        printWin.webContents.on('did-fail-load', () => {
+          try {
+            if (printWin && !printWin.isDestroyed()) printWin.close();
+          } catch (_) {}
+          resolve({ success: false, error: 'Failed to render PDF document.' });
+        });
+      } catch (err) {
+        if (printWin) {
+          try { if (!printWin.isDestroyed()) printWin.close(); } catch (_) {}
+        }
+        resolve({ success: false, error: err.message });
+      }
+    });
+  });
 }
 
 function createWindow() {

@@ -1,28 +1,22 @@
 import { getAllSettings, setMultipleSettings } from '../db/database.js';
 import { DEFAULT_SIGNATURE_BASE64 } from '../assets/defaultSignatureBase64.js';
 
+const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+
 export const DEFAULT_COMPANY = {
-  company_name: 'CORTEZ LAND AMORTIZATION COLLECTION TRACKER',
-  company_address: 'Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte',
-  company_contact: '0935-3551416',
-  company_email: 'artjrbarbasa@yahoo.com',
-  company_tin: '',
-  company_logo: '',
-  signatory_name: 'ARTEMIO TEDOCO-BARBASA',
-  signatory_title: 'Approved by',
-  signatory_esig: DEFAULT_SIGNATURE_BASE64
+  company_name: env.VITE_COMPANY_NAME || '',
+  company_address: env.VITE_COMPANY_ADDRESS || '',
+  company_contact: env.VITE_COMPANY_CONTACT || '',
+  company_email: env.VITE_COMPANY_EMAIL || '',
+  company_tin: env.VITE_COMPANY_TIN || '',
+  company_logo: env.VITE_COMPANY_LOGO || '',
+  signatory_name: env.VITE_SIGNATORY_NAME || '',
+  signatory_title: env.VITE_SIGNATORY_TITLE || 'Approved by',
+  signatory_esig: env.VITE_SIGNATORY_ESIG || DEFAULT_SIGNATURE_BASE64 || ''
 };
 
 export const SAMPLE_COMPANY_WITH_SIGNATORY = {
-  company_name: 'CORTEZ LAND AMORTIZATION COLLECTION TRACKER',
-  company_address: 'Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte',
-  company_contact: '0935-3551416',
-  company_email: 'artjrbarbasa@yahoo.com',
-  company_tin: '',
-  company_logo: '',
-  signatory_name: 'ARTEMIO TEDOCO-BARBASA',
-  signatory_title: 'Approved by',
-  signatory_esig: DEFAULT_SIGNATURE_BASE64
+  ...DEFAULT_COMPANY
 };
 
 /**
@@ -31,42 +25,16 @@ export const SAMPLE_COMPANY_WITH_SIGNATORY = {
 export async function getCompanySettings() {
   try {
     const stored = await getAllSettings();
-    const isOldDefault = !stored.company_name || 
-      stored.company_name === 'Angeles Land Development Inc.' ||
-      stored.signatory_name === 'Engr. Roberto M. Angeles';
-
-    if (isOldDefault) {
-      const merged = {
-        ...DEFAULT_COMPANY,
-        ...stored,
-        company_name: DEFAULT_COMPANY.company_name,
-        company_address: DEFAULT_COMPANY.company_address,
-        company_contact: DEFAULT_COMPANY.company_contact,
-        company_email: DEFAULT_COMPANY.company_email,
-        signatory_name: stored.signatory_name && stored.signatory_name !== 'Engr. Roberto M. Angeles' 
-          ? stored.signatory_name 
-          : DEFAULT_COMPANY.signatory_name,
-        signatory_title: stored.signatory_title && stored.signatory_name !== 'Engr. Roberto M. Angeles' 
-          ? stored.signatory_title 
-          : DEFAULT_COMPANY.signatory_title,
-        signatory_esig: stored.signatory_esig || DEFAULT_COMPANY.signatory_esig
-      };
-      await saveCompanySettings(merged);
-      return merged;
-    }
-    const signatoryName = stored.signatory_name || DEFAULT_COMPANY.signatory_name;
-    const isArtemio = signatoryName === 'ARTEMIO TEDOCO-BARBASA';
-
     return {
-      company_name: stored.company_name || DEFAULT_COMPANY.company_name,
-      company_address: stored.company_address || DEFAULT_COMPANY.company_address,
-      company_contact: stored.company_contact !== undefined ? stored.company_contact : DEFAULT_COMPANY.company_contact,
-      company_email: stored.company_email !== undefined ? stored.company_email : DEFAULT_COMPANY.company_email,
-      company_tin: stored.company_tin !== undefined ? stored.company_tin : DEFAULT_COMPANY.company_tin,
-      company_logo: stored.company_logo || '',
-      signatory_name: signatoryName,
-      signatory_title: (stored.signatory_title && stored.signatory_title !== 'Authorized Representative') ? stored.signatory_title : 'Approved by',
-      signatory_esig: (isArtemio || !stored.signatory_esig) ? DEFAULT_SIGNATURE_BASE64 : stored.signatory_esig
+      company_name: stored.company_name !== undefined && stored.company_name !== '' ? stored.company_name : DEFAULT_COMPANY.company_name,
+      company_address: stored.company_address !== undefined && stored.company_address !== '' ? stored.company_address : DEFAULT_COMPANY.company_address,
+      company_contact: stored.company_contact !== undefined && stored.company_contact !== '' ? stored.company_contact : DEFAULT_COMPANY.company_contact,
+      company_email: stored.company_email !== undefined && stored.company_email !== '' ? stored.company_email : DEFAULT_COMPANY.company_email,
+      company_tin: stored.company_tin !== undefined && stored.company_tin !== '' ? stored.company_tin : DEFAULT_COMPANY.company_tin,
+      company_logo: stored.company_logo || DEFAULT_COMPANY.company_logo,
+      signatory_name: stored.signatory_name !== undefined && stored.signatory_name !== '' ? stored.signatory_name : DEFAULT_COMPANY.signatory_name,
+      signatory_title: stored.signatory_title !== undefined && stored.signatory_title !== '' ? stored.signatory_title : DEFAULT_COMPANY.signatory_title,
+      signatory_esig: stored.signatory_esig || DEFAULT_COMPANY.signatory_esig
     };
   } catch (err) {
     console.warn('Failed to get company settings, returning defaults:', err);

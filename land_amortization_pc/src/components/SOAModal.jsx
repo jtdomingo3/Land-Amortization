@@ -1,15 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getCompanySettings } from '../print/companyConfig.js';
 import { generateSOAHTML } from '../print/soaGenerator.js';
-import { printDocument, shareOrSavePdf } from '../print/printService.js';
-import { X, Share2, Printer, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { printDocument, saveDocumentAsPdf } from '../print/printService.js';
+import {
+  X,
+  Printer,
+  Download,
+  FileSpreadsheet,
+  RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Calendar,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
 
 export function SOAModal({ isOpen, onClose, account, payments = [] }) {
   const [company, setCompany] = useState({});
   const [preset, setPreset] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [zoom, setZoom] = useState(1.0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
 
   useEffect(() => {
     if (!isOpen || !account) return;
@@ -24,25 +38,11 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
       }
     })();
 
-    // Default dates based on preset
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-    const todayMonth = `${currentYear}-${currentMonth}`;
-
-    if (preset === 'THIS_YEAR') {
-      setDateFrom(`${currentYear}-01`);
-      setDateTo(`${currentYear}-12`);
-    } else if (preset === 'YTD') {
-      setDateFrom(`${currentYear}-01`);
-      setDateTo(todayMonth);
-    } else if (preset === 'ALL') {
-      setDateFrom('');
-      setDateTo('');
-    }
+    setZoom(1.0);
+    setStatusMessage(null);
 
     return () => { isMounted = false; };
-  }, [isOpen, account, preset]);
+  }, [isOpen, account]);
 
   // Handle Preset Changes
   const handlePresetSelect = (newPreset) => {
@@ -79,75 +79,217 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
 
   if (!isOpen || !account) return null;
 
-  const handlePrintOrShare = async () => {
-    setIsPrinting(true);
+  const handleZoomIn = () => setZoom(prev => Math.min(1.6, Number((prev + 0.15).toFixed(2))));
+  const handleZoomOut = () => setZoom(prev => Math.max(0.65, Number((prev - 0.15).toFixed(2))));
+  const handleZoomReset = () => setZoom(1.0);
+
+  const periodLabel = dateFrom || dateTo ? `_${dateFrom || 'start'}_to_${dateTo || 'end'}` : '_Full';
+  const docTitle = `${account.name || 'Account'}_SOA${periodLabel}`;
+
+  const handlePrint = async () => {
+    setIsProcessing(true);
+    setStatusMessage(null);
     try {
-      const periodLabel = dateFrom || dateTo ? `_${dateFrom || 'start'}_to_${dateTo || 'end'}` : '_Full';
-      const docTitle = `${account.name || 'Account'}_SOA${periodLabel}`;
-      await shareOrSavePdf(soaHtml, docTitle);
+      const res = await printDocument(soaHtml, docTitle);
+      if (res && res.error) {
+        setStatusMessage({ type: 'error', text: `Print failed: ${res.error}` });
+      } else {
+        setStatusMessage({ type: 'success', text: 'Statement of Account sent to printer.' });
+        setTimeout(() => setStatusMessage(null), 4000);
+      }
     } catch (err) {
-      alert('Could not generate PDF: ' + err.message);
+      setStatusMessage({ type: 'error', text: `Print error: ${err.message}` });
     } finally {
-      setIsPrinting(false);
+      setIsProcessing(false);
     }
   };
 
-  const handlePrint = async () => {
-    setIsPrinting(true);
+  const handleSavePdf = async () => {
+    setIsProcessing(true);
+    setStatusMessage(null);
     try {
-      const periodLabel = dateFrom || dateTo ? `_${dateFrom || 'start'}_to_${dateTo || 'end'}` : '_Full';
-      const docTitle = `${account.name || 'Account'}_SOA${periodLabel}`;
-      await printDocument(soaHtml, docTitle);
+      const res = await saveDocumentAsPdf(soaHtml, docTitle);
+      if (res && res.success) {
+        setStatusMessage({ type: 'success', text: res.message || 'SOA saved as PDF successfully.' });
+        setTimeout(() => setStatusMessage(null), 4000);
+      } else if (res && res.canceled) {
+        // user canceled dialog
+      } else if (res && res.error) {
+        setStatusMessage({ type: 'error', text: `Save error: ${res.error}` });
+      }
     } catch (err) {
-      alert('Could not print: ' + err.message);
+      setStatusMessage({ type: 'error', text: `Could not save PDF: ${err.message}` });
     } finally {
-      setIsPrinting(false);
+      setIsProcessing(false);
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-content"
-        style={{ maxWidth: 760, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        className="modal-content print-preview-modal"
+        style={{
+          width: '92vw',
+          maxWidth: 1040,
+          height: '92vh',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0,
+          borderRadius: 14,
+          overflow: 'hidden',
+          background: 'var(--bg-card)',
+          boxShadow: '0 25px 60px -15px rgba(0,0,0,0.45)'
+        }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileSpreadsheet size={18} color="var(--accent-cyan)" />
+        {/* Header Bar */}
+        <div
+          className="print-preview-header"
+          style={{
+            padding: '12px 20px',
+            background: 'var(--bg-card-subtle)',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Identity */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: 'rgba(6, 182, 212, 0.12)',
+              color: 'var(--accent-cyan)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <FileSpreadsheet size={20} />
+            </div>
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Statement of Account (SOA)</h3>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                {account.name} • Account #{account.account_id}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0 }}>
+                  Print Preview — Statement of Account (SOA)
+                </h3>
+                <span className="badge badge-info" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                  A4 Formal Ledger
+                </span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {account.name} &bull; Title: {account.land_title_number || 'N/A'} &bull; {account.num_of_months || 120} Months Term
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onClose}
-            style={{ padding: '4px 8px' }}
-          >
-            <X size={16} />
-          </button>
+          {/* Zoom Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'var(--bg-input)',
+              borderRadius: 6,
+              padding: '2px 4px',
+              border: '1px solid var(--border-subtle)',
+              gap: 2
+            }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '3px 5px' }}
+                onClick={handleZoomOut}
+                title="Zoom Out"
+                disabled={zoom <= 0.65}
+              >
+                <ZoomOut size={13} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '0.72rem', padding: '3px 6px', fontWeight: 700, minWidth: 42 }}
+                onClick={handleZoomReset}
+                title="Reset to 100%"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '3px 5px' }}
+                onClick={handleZoomIn}
+                title="Zoom In"
+                disabled={zoom >= 1.6}
+              >
+                <ZoomIn size={13} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '3px 5px' }}
+                onClick={handleZoomReset}
+                title="Fit Width / 100%"
+              >
+                <Maximize2 size={13} />
+              </button>
+            </div>
+
+            {/* Actions: Save PDF & Print */}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleSavePdf}
+              disabled={isProcessing}
+              title="Save SOA as PDF document"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px' }}
+            >
+              <Download size={15} color="var(--accent-cyan)" />
+              <span>Save as PDF</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handlePrint}
+              disabled={isProcessing}
+              title="Send SOA directly to printer"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', fontWeight: 700 }}
+            >
+              {isProcessing ? <RefreshCw size={15} className="spin" /> : <Printer size={15} />}
+              <span>Print SOA</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onClose}
+              title="Close Preview"
+              style={{ padding: '7px 9px', marginLeft: 4 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        {/* Period Filter Bar */}
+        {/* Filter Toolbar: Schedule Period Options */}
         <div style={{
-          background: 'var(--bg-card-subtle)',
-          padding: '10px 16px',
+          background: 'var(--bg-card)',
+          padding: '8px 20px',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 8
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap'
         }}>
-          {/* Preset Buttons */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginRight: 4, textTransform: 'uppercase' }}>
-              Period:
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+            <Calendar size={14} color="var(--accent-cyan)" />
+            <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>Period:</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`btn btn-sm ${preset === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
@@ -190,102 +332,110 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
             </button>
           </div>
 
-          {/* Custom Date Pickers */}
           {preset === 'CUSTOM' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  From Month
-                </label>
-                <input
-                  type="month"
-                  className="form-input"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  To Month
-                </label>
-                <input
-                  type="month"
-                  className="form-input"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                />
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+              <input
+                type="month"
+                className="form-input"
+                style={{ padding: '3px 8px', fontSize: '0.75rem', width: 130 }}
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                placeholder="From"
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>to</span>
+              <input
+                type="month"
+                className="form-input"
+                style={{ padding: '3px 8px', fontSize: '0.75rem', width: 130 }}
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                placeholder="To"
+              />
             </div>
           )}
         </div>
 
-        {/* Live Preview Container */}
+        {/* Status Toast Banner */}
+        {statusMessage && (
+          <div style={{
+            padding: '8px 16px',
+            background: statusMessage.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+            borderBottom: `1px solid ${statusMessage.type === 'success' ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
+            color: statusMessage.type === 'success' ? 'var(--accent-emerald-light)' : '#fb7185',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {statusMessage.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+              <span>{statusMessage.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusMessage(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 2 }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Interactive Desktop Preview Canvas */}
         <div
-          className="modal-body"
+          className="print-preview-viewport"
           style={{
-            background: '#e2e8f0',
-            padding: 12,
-            overflowY: 'auto',
-            flex: 1
+            flex: 1,
+            overflow: 'auto',
+            background: '#334155', // Studio slate backdrop for contrast
+            padding: '24px 20px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start'
           }}
         >
+          {/* Scalable Paper Sheet Container */}
           <div
+            className="print-preview-sheet"
             style={{
+              width: 794, // Standard A4 width at 96 DPI
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease-out',
               background: '#ffffff',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
               borderRadius: 6,
-              overflow: 'hidden'
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              marginBottom: 40
             }}
             dangerouslySetInnerHTML={{ __html: soaHtml }}
           />
         </div>
 
-        {/* Modal Footer */}
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onClose}
-          >
-            Close
-          </button>
-
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handlePrint}
-              disabled={isPrinting}
-              title="Print Statement of Account"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}
-            >
-              <Printer size={16} />
-              <span className="hide-on-mobile">Print</span>
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handlePrintOrShare}
-              disabled={isPrinting}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 18px',
-                fontSize: '0.88rem'
-              }}
-            >
-              {isPrinting ? <RefreshCw size={16} className="spin" /> : <Share2 size={16} />}
-              <span>{isPrinting ? 'Generating PDF...' : 'Share / Save SOA (PDF)'}</span>
-            </button>
+        {/* Bottom Status / Summary Bar */}
+        <div
+          style={{
+            padding: '8px 20px',
+            background: 'var(--bg-card-subtle)',
+            borderTop: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.74rem',
+            color: 'var(--text-secondary)'
+          }}
+        >
+          <div>
+            Schedule: <strong>{preset === 'ALL' ? 'Complete Amortization Term' : (preset === 'YTD' ? 'Year-to-Date' : (preset === 'THIS_YEAR' ? 'Full Current Year' : 'Filtered Period'))}</strong> &bull; Total Payments Logged: {payments.length}
+          </div>
+          <div>
+            Format: Standard A4 Formal Statement &bull; Zoom: {Math.round(zoom * 100)}%
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 export default SOAModal;
