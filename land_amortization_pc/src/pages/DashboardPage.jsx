@@ -8,6 +8,7 @@ import { PaymentFormModal } from './PaymentFormModal.jsx';
 import { GoogleDriveShareModal } from '../components/GoogleDriveShareModal.jsx';
 import { FinancialDonutChart, MonthlyCollectionsChart } from '../components/DashboardCharts.jsx';
 import { toISODateString } from '../utils/formatters.js';
+import { getGoogleDriveConfig, uploadToGoogleDrive } from '../services/googleDriveService.js';
 import {
   Users,
   Wallet,
@@ -49,18 +50,34 @@ export function DashboardPage() {
   };
 
   const handleShareClick = async () => {
-    if (window.cordova || (window.plugins && window.plugins.socialsharing)) {
-      try {
-        setIsSharing(true);
-        await shareDrive();
-      } catch (err) {
-        console.warn('Native share notice:', err);
-      } finally {
-        setIsSharing(false);
-      }
-    } else {
-      // In web browser preview, open the Google Drive modal
+    const config = getGoogleDriveConfig();
+    const hasFolder = Boolean((config.folderUrl && config.folderUrl.trim()) || (config.webhookUrl && config.webhookUrl.trim()));
+
+    // If folder is not configured yet, open modal
+    if (!hasFolder) {
       setIsDriveModalOpen(true);
+      return;
+    }
+
+    // Once folder is configured, do not show modal! Automatically save new file!
+    try {
+      setIsSharing(true);
+      const targetFileName = `Land_Amortization_Tracker_${toISODateString(new Date())}.xlsx`;
+
+      if (config.webhookUrl && config.webhookUrl.trim()) {
+        const uploadRes = await uploadToGoogleDrive(accounts, payments, targetFileName);
+        alert(uploadRes.message || `Uploaded "${targetFileName}" directly to your Google Drive folder!`);
+        return;
+      }
+
+      const res = await shareDrive(targetFileName);
+      if (res && res.filePath && window.electronAPI?.shell?.showItemInFolder) {
+        window.electronAPI.shell.showItemInFolder(res.filePath);
+      }
+    } catch (err) {
+      console.warn('Google Drive save notice:', err);
+    } finally {
+      setIsSharing(false);
     }
   };
 

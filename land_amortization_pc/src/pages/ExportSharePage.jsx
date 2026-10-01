@@ -20,7 +20,7 @@ import {
   Settings
 } from 'lucide-react';
 import { GoogleDriveModal } from '../components/GoogleDriveModal.jsx';
-import { getGoogleDriveConfig, openGoogleDriveFolder } from '../services/googleDriveService.js';
+import { getGoogleDriveConfig, openGoogleDriveFolder, uploadToGoogleDrive } from '../services/googleDriveService.js';
 
 export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
   const {
@@ -45,10 +45,49 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
   const [lastExport, setLastExport] = useState(null);
   const gdriveConfig = getGoogleDriveConfig();
 
-  const handleSaveToDriveDirect = () => {
-    // Open the Google Drive setup modal so the user can easily review the folder link,
-    // ensure "Anyone with the link" is enabled, and tap "Save to Google Drive Now"
-    setIsDriveModalOpen(true);
+  const handleSaveToDriveDirect = async () => {
+    const config = getGoogleDriveConfig();
+    const hasFolder = Boolean((config.folderUrl && config.folderUrl.trim()) || (config.webhookUrl && config.webhookUrl.trim()));
+
+    // If folder is NOT updated/configured yet, open the modal dialog to setup
+    if (!hasFolder) {
+      setIsDriveModalOpen(true);
+      return;
+    }
+
+    // Once folder is updated, DO NOT show the modal! Automatically save new file!
+    try {
+      setLoadingAction('drive');
+      setSuccessMessage('');
+      setErrorMessage('');
+
+      // 1. If automated webhook is configured, upload directly to Google Drive
+      if (config.webhookUrl && config.webhookUrl.trim()) {
+        const uploadRes = await uploadToGoogleDrive(accounts, payments, exportFileName, (msg) => {
+          setSuccessMessage(msg);
+        });
+        setLastExport(uploadRes);
+        setSuccessMessage(`Workbook "${uploadRes.fileName}" uploaded directly to your Google Drive folder!`);
+        return;
+      }
+
+      // 2. Otherwise: Save new file to Documents > Amortization Tracker > ExcelFile
+      const res = await shareDrive(exportFileName);
+      setLastExport(res);
+
+      // Open the saved file in Windows File Explorer
+      if (res && res.filePath && window.electronAPI?.shell?.showItemInFolder) {
+        window.electronAPI.shell.showItemInFolder(res.filePath);
+      }
+
+      setSuccessMessage(
+        `New file "${res.fileName}" saved to Documents > Amortization Tracker > ExcelFile, and Google Drive opened in your browser!`
+      );
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to save to Google Drive');
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const handleSaveToDevice = async () => {

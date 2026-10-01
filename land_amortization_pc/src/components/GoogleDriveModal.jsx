@@ -6,12 +6,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
-  ShieldCheck,
   RefreshCw,
   LogOut,
   Upload,
   Link,
-  Smartphone
+  Laptop,
+  FolderOpen,
+  Copy,
+  Check,
+  Sparkles
 } from 'lucide-react';
 import {
   getGoogleDriveConfig,
@@ -23,7 +26,6 @@ import {
   generateAppsScriptCode
 } from '../services/googleDriveService.js';
 import { shareToGoogleDrive } from '../share/shareFile.js';
-import { Copy, Check, Terminal, Play, Sparkles } from 'lucide-react';
 
 export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = [], fileName = '' }) {
   const [config, setConfig] = useState(getGoogleDriveConfig());
@@ -35,6 +37,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [actionResult, setActionResult] = useState(null);
+  const [copiedScript, setCopiedScript] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,8 +61,11 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
       webhookUrl: webhookUrl.trim()
     });
     setConfig(updated);
-    setStatusMessage('Settings saved successfully.');
-    setTimeout(() => setStatusMessage(''), 3000);
+    setStatusMessage('Folder link saved! Future clicks on "Save to Google Drive" will automatically save new files without opening this setup dialog.');
+    setTimeout(() => {
+      setStatusMessage('');
+      if (onClose) onClose();
+    }, 2000);
   };
 
   const handleClearSettings = () => {
@@ -70,15 +76,13 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
     setUserEmail('');
     setWebhookUrl('');
     setActionResult(null);
-    setStatusMessage('Settings cleared.');
+    setStatusMessage('Google Drive configuration cleared.');
     setTimeout(() => setStatusMessage(''), 3000);
   };
 
   const handleOpenFolderLink = () => {
     openGoogleDriveFolder(folderUrl);
   };
-
-  const [copiedScript, setCopiedScript] = useState(false);
 
   const handleCopyScript = () => {
     const targetFolderId = extractFolderId(folderUrl) || 'YOUR_GOOGLE_DRIVE_FOLDER_ID';
@@ -91,34 +95,43 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
   const handleSaveToDrive = async () => {
     setIsProcessing(true);
     setErrorMsg('');
-    setStatusMessage('Saving backup and opening Google Drive...');
+    setStatusMessage('Saving backup...');
     setActionResult(null);
 
     try {
-      // Auto-save any folder URL entered
-      saveGoogleDriveConfig({
+      // Auto-save folder configuration
+      const updatedConfig = saveGoogleDriveConfig({
         folderUrl: folderUrl.trim(),
         folderName: folderName.trim() || 'Amortization Tracker Backups',
         userEmail: userEmail.trim(),
         webhookUrl: webhookUrl.trim()
       });
+      setConfig(updatedConfig);
 
-      // 1. If webhook configured, upload directly
+      // 1. If Webhook URL is set: Upload directly into Google Drive with 0 manual steps
       if (webhookUrl.trim()) {
         const res = await uploadToGoogleDrive(accounts, payments, fileName, (msg) => {
           setStatusMessage(msg);
         });
-        setActionResult(res);
+        setActionResult({
+          ...res,
+          isUploaded: true,
+          message: `Successfully uploaded "${res.fileName}" directly to your Google Drive folder!`
+        });
         setStatusMessage('');
         return;
       }
 
-      // 2. Standard Mobile/Web Google Drive Launch
+      // 2. Desktop Local Save + Open Google Drive
       const res = await shareToGoogleDrive(accounts, payments, fileName);
-      if (res.method === 'browser_drive_link') {
-        res.message = `Workbook "${res.fileName}" downloaded to your computer and Google Drive Backup folder opened. Drag the downloaded file into Google Drive to complete, or use the 1-minute Automated Webhook below to upload directly with zero manual steps!`;
+      if (res && res.filePath && window.electronAPI?.shell?.showItemInFolder) {
+        window.electronAPI.shell.showItemInFolder(res.filePath);
       }
-      setActionResult(res);
+      setActionResult({
+        ...res,
+        isUploaded: false,
+        message: `New file "${res.fileName}" saved to Documents > Amortization Tracker > ExcelFile, and your Google Drive folder opened in your browser. Drag the file from File Explorer into Google Drive to complete, or use the 1-minute Automated Webhook below to upload directly with zero manual clicks!`
+      });
       setStatusMessage('');
     } catch (err) {
       console.error('Google Drive error:', err);
@@ -136,7 +149,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
         className="btn btn-secondary btn-sm"
         onClick={handleSaveSettings}
       >
-        Save Settings
+        Save Folder Link
       </button>
 
       <div style={{ display: 'flex', gap: 8 }}>
@@ -155,7 +168,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           disabled={isProcessing}
         >
           <Upload size={14} />
-          {isProcessing ? 'Saving...' : 'Save to Google Drive Now'}
+          {isProcessing ? 'Saving...' : 'Save & Open Drive Now'}
         </button>
       </div>
     </div>
@@ -165,11 +178,11 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Google Drive Cloud Backup"
+      title="Google Drive Cloud Backup Setup"
       footer={modalFooter}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Mobile App Direct Connect Banner */}
+        {/* Desktop Workflow Banner */}
         <div style={{
           background: 'rgba(66, 133, 244, 0.08)',
           border: '1px solid rgba(66, 133, 244, 0.25)',
@@ -180,11 +193,11 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           gap: 6
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#60a5fa', fontWeight: 700, fontSize: '0.86rem' }}>
-            <Smartphone size={18} />
-            <span>Mobile 1-Tap Google Drive Integration</span>
+            <Laptop size={18} />
+            <span>Windows Desktop Google Drive Workflow</span>
           </div>
           <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-            No developer API keys or token setup needed! Tapping <strong>Save to Google Drive Now</strong> automatically connects with your logged-in Google account on your phone and opens the Google Drive folder selector.
+            Paste your Google Drive folder link below and click <strong>Save Folder Link</strong>. Once saved, clicking <strong>Save to Google Drive</strong> on the main screen will automatically save new files directly to your PC and open Drive without showing this dialog again.
           </div>
         </div>
 
@@ -203,7 +216,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
             <span>Folder Setup: Set "Anyone with the link"</span>
           </div>
           <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-            To ensure your backup folder accepts saves and is accessible, open your Google Drive folder, click <strong>Share</strong>, and set General Access to <strong>"Anyone with the link"</strong> (Editor or Viewer).
+            Open your Google Drive folder, click <strong>Share</strong>, and set General Access to <strong>"Anyone with the link"</strong> (Editor or Viewer).
           </div>
         </div>
 
@@ -242,31 +255,45 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           </div>
         )}
 
+        {/* Action result banner */}
         {actionResult && (
           <div style={{
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '1px solid rgba(16, 185, 129, 0.35)',
+            background: actionResult.isUploaded ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.12)',
+            border: `1px solid ${actionResult.isUploaded ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.3)'}`,
             borderRadius: 8,
             padding: '12px 14px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent-emerald)', fontWeight: 700, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: actionResult.isUploaded ? 'var(--accent-emerald)' : 'var(--accent-cyan)', fontWeight: 700, marginBottom: 6 }}>
               <CheckCircle2 size={18} />
-              <span>Google Drive Connected</span>
+              <span>{actionResult.isUploaded ? 'File Uploaded to Google Drive!' : 'Excel File Saved & Google Drive Opened'}</span>
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 8, lineHeight: 1.4 }}>
-              {actionResult.message || 'Backup file prepared and forwarded to Google Drive.'}
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.45 }}>
+              {actionResult.message}
             </div>
-            {folderUrl && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handleOpenFolderLink}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', padding: '6px 12px' }}
-              >
-                <ExternalLink size={14} />
-                Open Backup Folder in Google Drive
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {actionResult.filePath && window.electronAPI?.shell?.showItemInFolder && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => window.electronAPI.shell.showItemInFolder(actionResult.filePath)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', padding: '6px 12px' }}
+                >
+                  <FolderOpen size={14} color="var(--accent-cyan)" />
+                  Show in File Explorer
+                </button>
+              )}
+              {folderUrl && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleOpenFolderLink}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', padding: '6px 12px' }}
+                >
+                  <ExternalLink size={14} color="var(--accent-emerald)" />
+                  Open Backup Folder in Google Drive
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -307,7 +334,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
             onChange={e => setFolderUrl(e.target.value)}
           />
           <span className="form-helper">
-            Paste your shared Google Drive folder link. Tapping <strong>Open Folder</strong> verifies your link directly in Google Drive.
+            Paste your Google Drive folder link. Tapping <strong>Open Folder</strong> verifies your link directly in Google Drive.
           </span>
         </div>
 
@@ -365,13 +392,13 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           </div>
 
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-            To save directly into your Google Drive <strong>Backup</strong> folder with 0 manual steps:
+            To upload directly into your Google Drive folder with 0 manual steps:
             <ol style={{ margin: '6px 0 0 18px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <li>Open Google Drive &rarr; Click <strong>+ New &gt; More &gt; Google Apps Script</strong></li>
               <li>Click <strong>Copy Automated Upload Script</strong> above and paste into the editor</li>
               <li>Click <strong>Deploy &gt; New deployment &gt; Web app</strong></li>
               <li>Set <em>"Execute as"</em>: <strong>Me</strong> and <em>"Who has access"</em>: <strong>Anyone</strong> &rarr; Click <strong>Deploy</strong></li>
-              <li>Copy the Web App URL and paste below, then click <strong>Save Settings</strong>.</li>
+              <li>Copy the Web App URL and paste below, then click <strong>Save Folder Link</strong>.</li>
             </ol>
           </div>
 
@@ -401,6 +428,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
             </button>
           )}
         </div>
+
         {/* Author Credit */}
         <div style={{
           textAlign: 'center',
@@ -415,3 +443,4 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
     </Modal>
   );
 }
+export default GoogleDriveModal;
