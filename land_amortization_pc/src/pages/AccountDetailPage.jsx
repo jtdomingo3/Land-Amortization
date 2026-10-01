@@ -1,0 +1,473 @@
+import React, { useState } from 'react';
+import { useApp } from '../context/AppContext.jsx';
+import { StatusBadge } from '../components/StatusBadge.jsx';
+import { formatCurrency, formatDate } from '../utils/formatters.js';
+import { AccountFormModal } from './AccountFormModal.jsx';
+import { PaymentFormModal } from './PaymentFormModal.jsx';
+import { ReceiptPreviewModal } from '../components/ReceiptPreviewModal.jsx';
+import { SOAModal } from '../components/SOAModal.jsx';
+import {
+  ArrowLeft,
+  CalendarRange,
+  CreditCard,
+  Edit2,
+  Trash2,
+  AlertCircle,
+  FileText,
+  FileSpreadsheet,
+  Printer,
+  MapPin,
+  Clock
+} from 'lucide-react';
+
+export function AccountDetailPage({ accountId, onBack }) {
+  const {
+    accounts,
+    payments,
+    updateAccount,
+    deleteAccount,
+    addPayment,
+    setActiveTab,
+    setSelectedAccountId
+  } = useApp();
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [paymentModalConfig, setPaymentModalConfig] = useState({
+    isOpen: false,
+    defaultPaymentType: 'Installment',
+    defaultAmount: null
+  });
+  const [isSOAModalOpen, setIsSOAModalOpen] = useState(false);
+  const [selectedReceiptPayment, setSelectedReceiptPayment] = useState(null);
+
+  const account = accounts.find(a => String(a.account_id) === String(accountId));
+
+  if (!account) {
+    return (
+      <div style={{ padding: 20, textAlign: 'center' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Account not found</p>
+        <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginTop: 12 }}>
+          Back to Accounts
+        </button>
+      </div>
+    );
+  }
+
+  const unpaidDp = Math.max(0, (Number(account.down_payment) || 0) - (Number(account.total_dp_paid) || 0));
+
+  const openPaymentModal = (type = 'Installment', amount = null) => {
+    setPaymentModalConfig({
+      isOpen: true,
+      defaultPaymentType: type,
+      defaultAmount: amount
+    });
+  };
+
+  const accountPayments = payments.filter(
+    p => String(p.account_id) === String(account.account_id)
+  );
+
+  const handleDelete = async () => {
+    if (confirm(`Are you sure you want to delete Account #${account.account_id} (${account.name})? All associated payments will also be deleted.`)) {
+      await deleteAccount(account.account_id);
+      onBack();
+    }
+  };
+
+  const handleViewSchedule = () => {
+    setSelectedAccountId(account.account_id);
+    setActiveTab('schedule');
+  };
+
+  const progressPercent = account.total_contract_amount > 0
+    ? Math.min(100, (account.total_paid / account.total_contract_amount) * 100)
+    : 0;
+
+  return (
+    <div className="account-detail-page">
+      {/* Top Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ padding: '6px 10px' }}>
+          <ArrowLeft size={16} />
+          Back
+        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setIsEditModalOpen(true)}>
+            <Edit2 size={14} />
+            Edit
+          </button>
+          <button className="btn btn-danger btn-sm" onClick={handleDelete}>
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Header Card */}
+      <div className="glass-card" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              ACCOUNT #{account.account_id}
+            </span>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              {account.name}
+            </h2>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <span>Title: <strong>{account.land_title_number || 'N/A'}</strong></span>
+              <span>•</span>
+              <span>Area: <strong>{account.land_area_sqm || 0} sqm</strong></span>
+            </div>
+          </div>
+          <StatusBadge status={account.status} />
+        </div>
+
+        {/* Progress Bar */}
+        <div style={{ margin: '14px 0 6px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: 4 }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Paid: {formatCurrency(account.total_paid)}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-emerald-light)' }}>
+              {progressPercent.toFixed(1)}%
+            </span>
+          </div>
+          <div style={{ width: '100%', height: 8, background: 'var(--bg-surface)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${progressPercent}%`,
+              background: 'linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan))',
+              borderRadius: 99
+            }} />
+          </div>
+        </div>
+
+        {/* Financial Highlights */}
+        <div className="account-financials">
+          <div className="fin-col">
+            <span className="label">Total Contract</span>
+            <span className="value">{formatCurrency(account.total_contract_amount)}</span>
+          </div>
+          <div className="fin-col">
+            <span className="label">Base Balance</span>
+            <span className="value">{formatCurrency(account.base_balance)}</span>
+          </div>
+          <div className="fin-col full-width">
+            <span className="label">Outstanding Due (Incl. Penalties)</span>
+            <span className="value" style={{ color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontSize: '0.96rem' }}>
+              {formatCurrency(account.outstanding_balance)}
+            </span>
+          </div>
+        </div>
+
+        {/* Due Date & Overdue Info */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'var(--bg-card-subtle)',
+          borderRadius: 8,
+          padding: '8px 12px',
+          fontSize: '0.78rem'
+        }}>
+          <div>
+            <span style={{ color: 'var(--text-muted)' }}>Next Due Date: </span>
+            <strong style={{ fontFamily: 'var(--font-mono)' }}>{formatDate(account.next_due_date)}</strong>
+          </div>
+          {account.days_overdue > 0 ? (
+            <span style={{ color: 'var(--accent-amber)', fontWeight: 700 }}>
+              {account.days_overdue} days overdue
+            </span>
+          ) : (
+            <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>Up to date</span>
+          )}
+        </div>
+      </div>
+
+      {/* Down Payment Pending Alert Banner */}
+      {unpaidDp > 0 && (
+        <div style={{
+          background: 'rgba(234, 88, 12, 0.1)',
+          border: '1px solid rgba(234, 88, 12, 0.3)',
+          borderRadius: 10,
+          padding: '12px 14px',
+          marginBottom: 14,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertCircle size={16} />
+              <span>Down Payment Pending: {formatCurrency(unpaidDp)}</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+              Current amortization: <strong>{formatCurrency(account.monthly_amortization)}</strong>. Paying DP reduces it to <strong>{formatCurrency(Math.max(0, Number(account.total_contract_amount || 0) - (Number(account.total_dp_paid || 0) + unpaidDp)) / (Number(account.num_of_months) || 120))}</strong>/mo.
+            </div>
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ background: '#ea580c', borderColor: '#ea580c', color: '#fff', fontWeight: 700 }}
+            onClick={() => openPaymentModal('Down Payment', unpaidDp)}
+          >
+            Pay Down Payment
+          </button>
+        </div>
+      )}
+
+      {/* Quick Action Buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        {unpaidDp > 0 && (
+          <button
+            className="btn btn-secondary"
+            style={{
+              background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.15), rgba(249, 115, 22, 0.22))',
+              borderColor: 'rgba(234, 88, 12, 0.5)',
+              color: '#ea580c',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              fontSize: '0.88rem'
+            }}
+            onClick={() => openPaymentModal('Down Payment', unpaidDp)}
+          >
+            <CreditCard size={16} />
+            <span>Pay Down Payment ({formatCurrency(unpaidDp)})</span>
+          </button>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="btn btn-primary" onClick={() => openPaymentModal('Installment')}>
+            <CreditCard size={16} />
+            Record Payment
+          </button>
+          <button className="btn btn-secondary" onClick={handleViewSchedule}>
+            <CalendarRange size={16} />
+            Schedule
+          </button>
+        </div>
+      </div>
+
+      <button
+        className="btn btn-secondary btn-block"
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          padding: '10px 14px',
+          background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.1), rgba(16, 185, 129, 0.1))',
+          border: '1px solid rgba(2, 132, 199, 0.35)',
+          color: 'var(--text-primary)',
+          fontWeight: 700
+        }}
+        onClick={() => setIsSOAModalOpen(true)}
+      >
+        <FileSpreadsheet size={16} color="var(--accent-cyan)" />
+        <span>Statement of Account (SOA)</span>
+      </button>
+
+      {/* Derived Calculation Breakdown (All 13 Computed Fields) */}
+      <div className="glass-card" style={{ marginBottom: 14 }}>
+        <h3 style={{ fontSize: '0.86rem', fontWeight: 700, marginBottom: 10, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+          Calculations & Penalties
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: '0.8rem' }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Down Payment</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>
+              {formatCurrency(account.total_dp_paid ?? account.down_payment)}
+            </div>
+            {unpaidDp > 0 ? (
+              <span style={{ fontSize: '0.64rem', color: '#ea580c', display: 'block', marginTop: 1, fontWeight: 700 }}>
+                Unpaid: {formatCurrency(unpaidDp)}
+              </span>
+            ) : account.down_payment > 0 ? (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-emerald)', display: 'block', marginTop: 1, fontWeight: 600 }}>
+                ✓ Fully Paid
+              </span>
+            ) : null}
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Installments Paid</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>{formatCurrency(account.installments_paid)}</div>
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Monthly Amortization</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>{formatCurrency(account.monthly_amortization)}</div>
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Number of Months</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>{account.num_of_months || 120} mos</div>
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>DP Penalty (1%)</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, color: account.dp_penalty > 0 ? 'var(--accent-rose)' : 'inherit' }}>
+              {formatCurrency(account.dp_penalty)}
+            </div>
+            {account.dp_penalty > 0 && (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-rose)', display: 'block', marginTop: 1 }}>
+                1% of contract ({formatCurrency(account.total_contract_amount)})
+              </span>
+            )}
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Consecutive Missed</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, color: account.consecutive_missed >= 2 ? 'var(--accent-rose)' : 'inherit' }}>
+              {account.consecutive_missed || 0} months
+            </div>
+          </div>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>10% Missed Penalty</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, color: account.ten_percent_penalty > 0 ? 'var(--accent-rose)' : 'inherit' }}>
+              {formatCurrency(account.ten_percent_penalty)}
+            </div>
+            {account.ten_percent_penalty > 0 && (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-rose)', display: 'block', marginTop: 1 }}>
+                10% of {formatCurrency(account.delayed_months_amount)} delayed
+              </span>
+            )}
+          </div>
+          <div style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244,63,94,0.2)', padding: 8, borderRadius: 6 }}>
+            <span style={{ color: '#fb7185', fontSize: '0.72rem' }}>Total Penalties</span>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 2, color: '#fb7185' }}>
+              {formatCurrency(account.total_penalties)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Account Info Details */}
+      <div className="glass-card" style={{ marginBottom: 14 }}>
+        <h3 style={{ fontSize: '0.86rem', fontWeight: 700, marginBottom: 10, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+          Contract Information
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Date of Start:</span>
+            <span>{formatDate(account.date_of_start)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>First Due Date:</span>
+            <span>{formatDate(account.first_due_date)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Agreed DP Due:</span>
+            <span>{formatDate(account.agreed_dp_due)}</span>
+          </div>
+          {account.remarks && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              <strong>Remarks: </strong> {account.remarks}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Payment History for this account */}
+      <div className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <h3 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+            Payment History ({accountPayments.length})
+          </h3>
+          <button className="btn btn-secondary btn-sm" onClick={() => setIsPaymentModalOpen(true)}>
+            + Add
+          </button>
+        </div>
+
+        {accountPayments.length === 0 ? (
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+            No payments recorded yet.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {accountPayments.map(p => (
+              <div
+                key={p.payment_id}
+                style={{
+                  background: 'var(--bg-card-subtle)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.84rem' }}>
+                    {formatCurrency(p.amount_paid)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    {formatDate(p.payment_date)} • {p.payment_type} • {p.payment_method}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+                      {p.receipt_no || `ID #${p.payment_id}`}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {p.month_covered}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setSelectedReceiptPayment(p)}
+                    title="Print / Share Receipt"
+                  >
+                    <Printer size={12} color="var(--accent-emerald)" />
+                    <span>Receipt</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Edit Account Modal */}
+      <AccountFormModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={updateAccount}
+        editAccount={account}
+        existingAccounts={accounts}
+      />
+
+      {/* Add Payment Modal */}
+      <PaymentFormModal
+        isOpen={paymentModalConfig.isOpen}
+        onClose={() => setPaymentModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onSave={addPayment}
+        accounts={accounts}
+        defaultAccountId={account.account_id}
+        defaultPaymentType={paymentModalConfig.defaultPaymentType}
+        defaultAmount={paymentModalConfig.defaultAmount}
+      />
+
+      {/* Statement of Account (SOA) Modal */}
+      {isSOAModalOpen && (
+        <SOAModal
+          isOpen={isSOAModalOpen}
+          onClose={() => setIsSOAModalOpen(false)}
+          account={account}
+          payments={payments}
+        />
+      )}
+
+      {/* Receipt Preview & Share Modal */}
+      {selectedReceiptPayment && (
+        <ReceiptPreviewModal
+          isOpen={Boolean(selectedReceiptPayment)}
+          onClose={() => setSelectedReceiptPayment(null)}
+          payment={selectedReceiptPayment}
+          account={account}
+          allPayments={payments}
+        />
+      )}
+    </div>
+  );
+}

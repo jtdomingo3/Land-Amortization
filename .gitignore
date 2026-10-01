@@ -75,3 +75,14 @@ window_dump.xml
 screen_*.png
 gdrive_*.png
 
+# Secrets and environment files
+*supbase_api_key*
+*supabase_api_key*
+*supabase*key*
+.env
+.env.*
+*.env
+
+# Electron build outputs
+dist-electron/
+
