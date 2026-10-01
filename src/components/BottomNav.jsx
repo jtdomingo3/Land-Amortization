@@ -6,7 +6,7 @@ import {
   CreditCard,
   CalendarRange,
   CloudUpload,
-  HelpCircle
+  Settings
 } from 'lucide-react';
 
 export function BottomNav() {
@@ -18,7 +18,7 @@ export function BottomNav() {
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'schedule', label: 'Schedule', icon: CalendarRange },
     { id: 'export', label: 'Export', icon: CloudUpload },
-    { id: 'help', label: 'Help', icon: HelpCircle }
+    { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   return (

@@ -7,7 +7,7 @@ import { AccountsPage } from './pages/AccountsPage.jsx';
 import { PaymentsPage } from './pages/PaymentsPage.jsx';
 import { SchedulePage } from './pages/SchedulePage.jsx';
 import { ExportSharePage } from './pages/ExportSharePage.jsx';
-import { HelpPage } from './pages/HelpPage.jsx';
+import { SettingsPage } from './pages/SettingsPage.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import { Loader2 } from 'lucide-react';
 
@@ -47,38 +47,44 @@ export function App() {
         return <SchedulePage />;
       case 'export':
         return <ExportSharePage />;
+      case 'settings':
+        return <SettingsPage />;
       case 'help':
-        return <HelpPage />;
+        return <SettingsPage defaultOpenHelp={true} />;
       default:
         return <DashboardPage />;
     }
   };
 
   return (
-    <div className="app-container">
-      <Header />
+    <>
+      <div className="app-container">
+        <Header />
 
-      {error && (
-        <div style={{
-          background: 'rgba(244, 63, 94, 0.15)',
-          borderBottom: '1px solid rgba(244, 63, 94, 0.3)',
-          color: '#fb7185',
-          padding: '8px 16px',
-          fontSize: '0.8rem',
-          textAlign: 'center'
-        }}>
-          Database Warning: {error}
-        </div>
-      )}
+        {error && (
+          <div style={{
+            background: 'rgba(244, 63, 94, 0.15)',
+            borderBottom: '1px solid rgba(244, 63, 94, 0.3)',
+            color: '#fb7185',
+            padding: '8px 16px',
+            fontSize: '0.8rem',
+            textAlign: 'center'
+          }}>
+            Database Warning: {error}
+          </div>
+        )}
 
-      <main className="app-content">
-        {renderContent()}
-      </main>
+        <main className="app-content">
+          {renderContent()}
+        </main>
 
-      <WelcomeModal />
+        <WelcomeModal />
 
-      <BottomNav />
-    </div>
+        <BottomNav />
+      </div>
+
+      <div id="print-area"></div>
+    </>
   );
 }
 

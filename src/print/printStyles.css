@@ -1,0 +1,326 @@
+/* ====================================================
+   PRINT STYLES FOR RECEIPTS & STATEMENT OF ACCOUNT (SOA)
+   Optimized for A4 Paper (Single & Multi-Page)
+   ==================================================== */
+
+/* Screen mode: hide print area */
+#print-area {
+  display: none;
+}
+
+/* Print mode */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app shell and overlays during print */
+  .app-container,
+  .modal-overlay,
+  .bottom-nav,
+  .app-header,
+  .fab,
+  button,
+  .search-filter-bar {
+    display: none !important;
+  }
+
+  /* Show only print area */
+  #print-area {
+    display: block !important;
+    width: 100% !important;
+    background: #ffffff !important;
+  }
+
+  .print-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 20mm 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-page:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .no-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
+/* ====================================================
+   RECEIPT & SOA SHARED COMPONENT STYLES
+   (Used both in in-app modal preview and print output)
+   ==================================================== */
+
+.document-sheet {
+  background: #ffffff;
+  color: #1e293b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  border-radius: 4px;
+}
+
+/* Document Header (Company, Logo, Title) */
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.doc-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.doc-logo {
+  max-width: 68px;
+  max-height: 68px;
+  object-fit: contain;
+}
+
+.doc-company-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px 0;
+  text-transform: uppercase;
+}
+
+.doc-company-detail {
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.doc-title-badge {
+  text-align: right;
+}
+
+.doc-type-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.doc-counter {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #047857;
+  margin-top: 2px;
+}
+
+/* Document Key-Value Grids */
+.doc-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.doc-info-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.doc-info-box-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.doc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.doc-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.doc-value {
+  color: #0f172a;
+  font-weight: 600;
+  text-align: right;
+}
+
+.doc-value.mono {
+  font-family: "JetBrains Mono", Consolas, Menlo, monospace;
+}
+
+/* Document Tables */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-size: 0.78rem;
+}
+
+.doc-table th {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 7px 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
+.doc-table th.right,
+.doc-table td.right {
+  text-align: right;
+}
+
+.doc-table th.center,
+.doc-table td.center {
+  text-align: center;
+}
+
+.doc-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+.doc-table tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.doc-table tr.total-row td {
+  background: #f1f5f9;
+  font-weight: 700;
+  border-top: 2px solid #0f172a;
+  border-bottom: 2px solid #0f172a;
+  color: #0f172a;
+}
+
+/* Balance Summary Callout */
+.doc-summary-card {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.doc-summary-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #475569;
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+
+.doc-grand-total {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 2px solid #0f172a;
+}
+
+/* Signatures */
+.doc-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+  padding-top: 10px;
+}
+
+.doc-sig-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.doc-sig-image-container {
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin-bottom: -10px;
+  z-index: 2;
+}
+
+.doc-sig-image {
+  max-height: 48px;
+  max-width: 140px;
+  object-fit: contain;
+}
+
+.doc-sig-line {
+  width: 100%;
+  max-width: 220px;
+  border-bottom: 1.5px solid #0f172a;
+  margin-bottom: 4px;
+}
+
+.doc-sig-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.doc-sig-title {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+/* Document Footer */
+.doc-footer {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px dashed #cbd5e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}

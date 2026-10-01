@@ -4,6 +4,8 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { AccountFormModal } from './AccountFormModal.jsx';
 import { PaymentFormModal } from './PaymentFormModal.jsx';
+import { ReceiptPreviewModal } from '../components/ReceiptPreviewModal.jsx';
+import { SOAModal } from '../components/SOAModal.jsx';
 import {
   ArrowLeft,
   CalendarRange,
@@ -12,6 +14,8 @@ import {
   Trash2,
   AlertCircle,
   FileText,
+  FileSpreadsheet,
+  Printer,
   MapPin,
   Clock
 } from 'lucide-react';
@@ -29,6 +33,8 @@ export function AccountDetailPage({ accountId, onBack }) {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isSOAModalOpen, setIsSOAModalOpen] = useState(false);
+  const [selectedReceiptPayment, setSelectedReceiptPayment] = useState(null);
 
   const account = accounts.find(a => String(a.account_id) === String(accountId));
 
@@ -162,7 +168,7 @@ export function AccountDetailPage({ accountId, onBack }) {
       </div>
 
       {/* Quick Action Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <button className="btn btn-primary" onClick={() => setIsPaymentModalOpen(true)}>
           <CreditCard size={16} />
           Record Payment
@@ -172,6 +178,26 @@ export function AccountDetailPage({ accountId, onBack }) {
           Monthly Schedule
         </button>
       </div>
+
+      <button
+        className="btn btn-secondary btn-block"
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          padding: '10px 14px',
+          background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.1), rgba(16, 185, 129, 0.1))',
+          border: '1px solid rgba(2, 132, 199, 0.35)',
+          color: 'var(--text-primary)',
+          fontWeight: 700
+        }}
+        onClick={() => setIsSOAModalOpen(true)}
+      >
+        <FileSpreadsheet size={16} color="var(--accent-cyan)" />
+        <span>Statement of Account (SOA)</span>
+      </button>
 
       {/* Derived Calculation Breakdown (All 13 Computed Fields) */}
       <div className="glass-card" style={{ marginBottom: 14 }}>
@@ -298,13 +324,24 @@ export function AccountDetailPage({ accountId, onBack }) {
                     {formatDate(p.payment_date)} • {p.payment_type} • {p.payment_method}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
-                    {p.receipt_no || `ID #${p.payment_id}`}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+                      {p.receipt_no || `ID #${p.payment_id}`}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {p.month_covered}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {p.month_covered}
-                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setSelectedReceiptPayment(p)}
+                    title="Print / Share Receipt"
+                  >
+                    <Printer size={12} color="var(--accent-emerald)" />
+                    <span>Receipt</span>
+                  </button>
                 </div>
               </div>
             ))}
@@ -329,6 +366,27 @@ export function AccountDetailPage({ accountId, onBack }) {
         accounts={accounts}
         defaultAccountId={account.account_id}
       />
+
+      {/* Statement of Account (SOA) Modal */}
+      {isSOAModalOpen && (
+        <SOAModal
+          isOpen={isSOAModalOpen}
+          onClose={() => setIsSOAModalOpen(false)}
+          account={account}
+          payments={payments}
+        />
+      )}
+
+      {/* Receipt Preview & Share Modal */}
+      {selectedReceiptPayment && (
+        <ReceiptPreviewModal
+          isOpen={Boolean(selectedReceiptPayment)}
+          onClose={() => setSelectedReceiptPayment(null)}
+          payment={selectedReceiptPayment}
+          account={account}
+          allPayments={payments}
+        />
+      )}
     </div>
   );
 }

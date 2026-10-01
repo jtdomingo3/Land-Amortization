@@ -514,3 +514,68 @@ export async function clearAllData() {
   await runSql('DELETE FROM land_accounts');
   return true;
 }
+
+// ============================================
+// APP SETTINGS OPERATIONS
+// ============================================
+
+export async function getAllSettings() {
+  if (isWebFallback) {
+    return getWebData(WEB_STORAGE_KEYS.SETTINGS, {});
+  }
+  try {
+    const res = await runSql('SELECT key, value FROM app_settings');
+    const settings = {};
+    for (const row of res.rows) {
+      settings[row.key] = row.value;
+    }
+    return settings;
+  } catch (err) {
+    console.warn('Failed to load settings from SQLite, fallback to empty:', err);
+    return {};
+  }
+}
+
+export async function getSetting(key, defaultVal = null) {
+  if (isWebFallback) {
+    const settings = getWebData(WEB_STORAGE_KEYS.SETTINGS, {});
+    return settings[key] !== undefined ? settings[key] : defaultVal;
+  }
+  try {
+    const res = await runSql('SELECT value FROM app_settings WHERE key = ?', [key]);
+    if (res.rows && res.rows.length > 0) {
+      return res.rows[0].value;
+    }
+    return defaultVal;
+  } catch (err) {
+    console.warn(`Failed to get setting ${key}:`, err);
+    return defaultVal;
+  }
+}
+
+export async function setSetting(key, value) {
+  const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+  if (isWebFallback) {
+    const settings = getWebData(WEB_STORAGE_KEYS.SETTINGS, {});
+    settings[key] = strVal;
+    setWebData(WEB_STORAGE_KEYS.SETTINGS, settings);
+    return true;
+  }
+  await runSql('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, strVal]);
+  return true;
+}
+
+export async function setMultipleSettings(settingsObj) {
+  if (!settingsObj || typeof settingsObj !== 'object') return false;
+  if (isWebFallback) {
+    const settings = getWebData(WEB_STORAGE_KEYS.SETTINGS, {});
+    Object.assign(settings, settingsObj);
+    setWebData(WEB_STORAGE_KEYS.SETTINGS, settings);
+    return true;
+  }
+  for (const [key, value] of Object.entries(settingsObj)) {
+    const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+    await runSql('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, strVal]);
+  }
+  return true;
+}

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { PAYMENT_TYPES } from '../utils/constants.js';
 import { PaymentFormModal } from './PaymentFormModal.jsx';
+import { ReceiptPreviewModal } from '../components/ReceiptPreviewModal.jsx';
 import {
   Search,
   Plus,
@@ -11,6 +12,7 @@ import {
   Trash2,
   Calendar,
   Receipt,
+  Printer,
   Filter
 } from 'lucide-react';
 
@@ -28,6 +30,7 @@ export function PaymentsPage() {
   const [selectedType, setSelectedType] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
+  const [receiptModalPayment, setReceiptModalPayment] = useState(null);
 
   // Filter payments
   const filteredPayments = useMemo(() => {
@@ -207,8 +210,18 @@ export function PaymentsPage() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     className="btn btn-secondary btn-sm"
+                    style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setReceiptModalPayment(p)}
+                    title="Print / Share Receipt"
+                  >
+                    <Printer size={12} color="var(--accent-emerald)" />
+                    <span>Receipt</span>
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
                     style={{ padding: '4px 8px', fontSize: '0.72rem' }}
                     onClick={() => setEditingPayment(p)}
+                    title="Edit Payment"
                   >
                     <Edit2 size={12} />
                   </button>
@@ -216,6 +229,7 @@ export function PaymentsPage() {
                     className="btn btn-danger btn-sm"
                     style={{ padding: '4px 8px', fontSize: '0.72rem' }}
                     onClick={() => handleDelete(p)}
+                    title="Delete Payment"
                   >
                     <Trash2 size={12} />
                   </button>
@@ -258,6 +272,17 @@ export function PaymentsPage() {
           onSave={updatePayment}
           editPayment={editingPayment}
           accounts={accounts}
+        />
+      )}
+
+      {/* Receipt Preview & Share Modal */}
+      {receiptModalPayment && (
+        <ReceiptPreviewModal
+          isOpen={Boolean(receiptModalPayment)}
+          onClose={() => setReceiptModalPayment(null)}
+          payment={receiptModalPayment}
+          account={accounts.find(a => String(a.account_id) === String(receiptModalPayment.account_id))}
+          allPayments={payments}
         />
       )}
     </div>
