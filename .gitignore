@@ -25,13 +25,40 @@ node_modules/
 /plugins/
 /platforms/
 
-# Android APK builds and emulator artifacts
+# Android APK builds and packaging artifacts
 *.apk
+*.ap_
 *.aab
+*.idsig
 Land_Amortization_Tracker.apk
-platforms/android/app/build/
+output-metadata.json
+
+# Android Emulator, AVD and virtual machine files
 .android/
 *.avd/
+*.qcow2
+*.img
+*.snapshot
+snapshots/
+emulator/
+hardware-qemu.ini
+qemu.lock
+advancedFeatures.ini
+
+# Android build outputs and SDK caches
+.gradle/
+build/
+*/build/
+platforms/android/app/build/
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+
+# IDE configurations
+.idea/
+*.iml
+.vscode/
 
 # Test files and scratch outputs
 test_output.xlsx
