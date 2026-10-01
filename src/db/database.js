@@ -6,93 +6,112 @@ import {
   CREATE_TABLE_EXPORT_LOG
 } from './queries.js';
 
+import { addMonthsEdate } from '../utils/dateUtils.js';
+
 let dbInstance = null;
 let isWebFallback = false;
 
-// Initial sample data from Excel
-const INITIAL_ACCOUNTS = [
-  {
-    account_id: 1001,
-    name: "Juan Dela Cruz",
-    date_of_start: "2026-09-30",
-    first_due_date: "2026-10-30",
-    land_title_number: "TCT-12345",
-    land_area_sqm: 500,
-    total_contract_amount: 1500000,
-    down_payment: 50000,
-    agreed_dp_due: "2026-09-25",
-    monthly_amortization: 12083.33,
-    num_of_months: 120,
-    remarks: "Sample buyer 1 - Lot 4 Block 2"
-  },
-  {
-    account_id: 1002,
-    name: "Pedro Santos",
-    date_of_start: "2026-10-05",
-    first_due_date: "2026-11-05",
-    land_title_number: "TCT-67890",
-    land_area_sqm: 100,
-    total_contract_amount: 300000,
-    down_payment: 20000,
-    agreed_dp_due: "2026-10-01",
-    monthly_amortization: 2333.33,
-    num_of_months: 120,
-    remarks: "Sample buyer 2 - Lot 8 Block 1"
-  }
-];
+/**
+ * Generates sample demo accounts and payments dynamically relative to the current date.
+ * Guarantees that active, overdue, and penalty states are demonstrated regardless of device clock.
+ */
+export function getSampleData() {
+  const today = new Date();
+  const todayStr = today.toISOString().substring(0, 10);
 
-const INITIAL_PAYMENTS = [
-  {
-    payment_id: 1,
-    account_id: 1001,
-    payment_date: "2026-10-30",
-    payment_type: "Installment",
-    amount_paid: 12083.33,
-    receipt_no: "OR-10001",
-    payment_method: "Cash",
-    remarks: "1st installment"
-  },
-  {
-    payment_id: 2,
-    account_id: 1001,
-    payment_date: "2026-11-30",
-    payment_type: "Installment",
-    amount_paid: 12083.33,
-    receipt_no: "OR-10002",
-    payment_method: "Cash",
-    remarks: "2nd installment"
-  },
-  {
-    payment_id: 3,
-    account_id: 1002,
-    payment_date: "2026-10-10",
-    payment_type: "Installment",
-    amount_paid: 2334.00,
-    receipt_no: "OR-20001",
-    payment_method: "Cash",
-    remarks: "Initial advance installment"
-  },
-  {
-    payment_id: 4,
-    account_id: 1001,
-    payment_date: "2026-11-30",
-    payment_type: "Installment",
-    amount_paid: 12083.33,
-    receipt_no: "OR-10003",
-    payment_method: "Cash",
-    remarks: "3rd installment"
-  },
-  {
-    payment_id: 5,
-    account_id: 1001,
-    payment_date: "2026-12-01",
-    payment_type: "Installment",
-    amount_paid: 100000.00,
-    receipt_no: "OR-10004",
-    payment_method: "Bank Transfer",
-    remarks: "Advance lump sum payment"
-  }
-];
+  const accounts = [
+    {
+      account_id: 1001,
+      name: "Juan Dela Cruz",
+      date_of_start: addMonthsEdate(todayStr, -12),
+      first_due_date: addMonthsEdate(todayStr, -11),
+      land_title_number: "TCT-12345",
+      land_area_sqm: 500,
+      total_contract_amount: 1500000,
+      down_payment: 50000,
+      agreed_dp_due: addMonthsEdate(todayStr, -12),
+      monthly_amortization: 12083.33,
+      num_of_months: 180,
+      remarks: "Sample buyer 1 - On Track (Advance Payer, 180 Mos Term)"
+    },
+    {
+      account_id: 1002,
+      name: "Pedro Santos",
+      date_of_start: addMonthsEdate(todayStr, -4),
+      first_due_date: addMonthsEdate(todayStr, -3),
+      land_title_number: "TCT-67890",
+      land_area_sqm: 100,
+      total_contract_amount: 300000,
+      down_payment: 20000,
+      agreed_dp_due: addMonthsEdate(todayStr, -4),
+      monthly_amortization: 2333.33,
+      num_of_months: 120,
+      remarks: "Sample buyer 2 - Delinquent (3 Consecutive Missed Months, 10% Late Penalty)"
+    },
+    {
+      account_id: 1003,
+      name: "Maria Clara",
+      date_of_start: addMonthsEdate(todayStr, -2),
+      first_due_date: addMonthsEdate(todayStr, 1),
+      land_title_number: "TCT-99999",
+      land_area_sqm: 250,
+      total_contract_amount: 500000,
+      down_payment: 0,
+      agreed_dp_due: addMonthsEdate(todayStr, -1),
+      monthly_amortization: 4166.67,
+      num_of_months: 120,
+      remarks: "Sample buyer 3 - Down Payment Overdue (1% Contract Amount Penalty)"
+    }
+  ];
+
+  const payments = [
+    {
+      payment_id: 1,
+      account_id: 1001,
+      payment_date: addMonthsEdate(todayStr, -11),
+      payment_type: "Installment",
+      amount_paid: 12083.33,
+      receipt_no: "OR-10001",
+      payment_method: "Cash",
+      remarks: "1st installment"
+    },
+    {
+      payment_id: 2,
+      account_id: 1001,
+      payment_date: addMonthsEdate(todayStr, -10),
+      payment_type: "Installment",
+      amount_paid: 12083.33,
+      receipt_no: "OR-10002",
+      payment_method: "Cash",
+      remarks: "2nd installment"
+    },
+    {
+      payment_id: 3,
+      account_id: 1001,
+      payment_date: addMonthsEdate(todayStr, -9),
+      payment_type: "Installment",
+      amount_paid: 12083.33,
+      receipt_no: "OR-10003",
+      payment_method: "Cash",
+      remarks: "3rd installment"
+    },
+    {
+      payment_id: 4,
+      account_id: 1001,
+      payment_date: addMonthsEdate(todayStr, -6),
+      payment_type: "Installment",
+      amount_paid: 145000.00,
+      receipt_no: "OR-10004",
+      payment_method: "Bank Transfer",
+      remarks: "Advance lump sum payment"
+    }
+  ];
+
+  return { accounts, payments };
+}
+
+export const INITIAL_ACCOUNTS = getSampleData().accounts;
+export const INITIAL_PAYMENTS = getSampleData().payments;
 
 // Helper: Web localStorage store
 const WEB_STORAGE_KEYS = {
@@ -467,18 +486,19 @@ export async function addExportLog({ export_type, file_name, accounts_exported, 
 // ============================================
 
 export async function resetToSampleData() {
+  const { accounts, payments } = getSampleData();
   if (isWebFallback) {
-    setWebData(WEB_STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    setWebData(WEB_STORAGE_KEYS.PAYMENTS, INITIAL_PAYMENTS);
+    setWebData(WEB_STORAGE_KEYS.ACCOUNTS, accounts);
+    setWebData(WEB_STORAGE_KEYS.PAYMENTS, payments);
     setWebData(WEB_STORAGE_KEYS.EXPORT_LOG, []);
     return true;
   }
   await runSql('DELETE FROM payments');
   await runSql('DELETE FROM land_accounts');
-  for (const acc of INITIAL_ACCOUNTS) {
+  for (const acc of accounts) {
     await insertAccount(acc);
   }
-  for (const p of INITIAL_PAYMENTS) {
+  for (const p of payments) {
     await insertPayment(p);
   }
   return true;

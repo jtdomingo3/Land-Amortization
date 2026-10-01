@@ -14,9 +14,15 @@ import {
   Trash2,
   AlertTriangle,
   FolderDown,
-  Info
+  Info,
+  Cloud,
+  Folder,
+  ExternalLink,
+  Settings
 } from 'lucide-react';
-import { GoogleDriveShareModal } from '../components/GoogleDriveShareModal.jsx';
+import { GoogleDriveModal } from '../components/GoogleDriveModal.jsx';
+import { getGoogleDriveConfig, openGoogleDriveFolder } from '../services/googleDriveService.js';
+import { shareToOtherApps } from '../share/shareFile.js';
 
 export function ExportSharePage() {
   const {
@@ -38,24 +44,35 @@ export function ExportSharePage() {
   );
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [lastExport, setLastExport] = useState(null);
+  const gdriveConfig = getGoogleDriveConfig();
 
-  const handleShareToDrive = async () => {
-    if (window.cordova || (window.plugins && window.plugins.socialsharing)) {
-      try {
-        setLoadingAction('share');
-        setSuccessMessage('');
-        setErrorMessage('');
-        const res = await shareDrive(exportFileName);
-        setLastExport(res);
-        setSuccessMessage(res.message || `File ready to share: ${res.fileName}`);
-      } catch (err) {
-        setErrorMessage(err.message || 'Failed to share to Google Drive');
-      } finally {
-        setLoadingAction(null);
-      }
-    } else {
-      // In web browser preview, open the Google Drive modal
-      setIsDriveModalOpen(true);
+  const handleSaveToDriveDirect = async () => {
+    try {
+      setLoadingAction('drive');
+      setSuccessMessage('');
+      setErrorMessage('');
+      const res = await shareDrive(exportFileName);
+      setLastExport(res);
+      setSuccessMessage(res.message || 'Google Drive opened! Choose your Google account and target folder.');
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to open Google Drive');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    try {
+      setLoadingAction('share_apps');
+      setSuccessMessage('');
+      setErrorMessage('');
+      const res = await shareToOtherApps(accounts, payments, exportFileName);
+      setLastExport(res);
+      setSuccessMessage(res.message || 'Share options opened.');
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to open share menu');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -130,10 +147,11 @@ export function ExportSharePage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
             <ShieldCheck size={14} />
-            <span>Google Drive Upload • 100% Offline Database</span>
+            <span>Documents Storage • Direct Google Drive Account Sync</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-            When you tap <strong>Share to Google Drive</strong>, Android's share menu opens. Select Google Drive to upload and convert your 5-sheet report into a Google Sheet directly to your Drive account.
+            • <strong>Local Backup:</strong> Saved directly inside <code>Documents/Amortization Tracker/</code> on your device.<br />
+            • <strong>Google Drive:</strong> Connects directly to your Google account on your phone to upload into your selected folder with 0 developer setup!
           </div>
         </div>
       </div>
@@ -222,24 +240,81 @@ export function ExportSharePage() {
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        <button
-          className="btn btn-secondary btn-block"
-          style={{ padding: '14px', fontSize: '0.96rem' }}
-          onClick={handleSaveToDevice}
-          disabled={loadingAction !== null}
-        >
-          <Download size={18} />
-          {loadingAction === 'save' ? 'Saving .xlsx file...' : 'Save .xlsx to Local Storage'}
-        </button>
+        <div>
+          <button
+            className="btn btn-secondary btn-block"
+            style={{ padding: '14px', fontSize: '0.96rem' }}
+            onClick={handleSaveToDevice}
+            disabled={loadingAction !== null}
+          >
+            <FolderDown size={18} />
+            {loadingAction === 'save' ? 'Saving to Documents...' : 'Save .xlsx to Local Storage'}
+          </button>
+          <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 4 }}>
+            📁 Destination: <strong>Documents/Amortization Tracker/</strong>
+          </div>
+        </div>
+
+        <div>
+          <button
+            className="btn btn-drive btn-block"
+            style={{ padding: '14px', fontSize: '0.96rem', background: 'linear-gradient(135deg, #4285F4, #34A853)' }}
+            onClick={handleSaveToDriveDirect}
+            disabled={loadingAction !== null}
+          >
+            <Cloud size={18} />
+            {loadingAction === 'drive' ? 'Opening Google Drive...' : 'Save to Google Drive'}
+          </button>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => setIsDriveModalOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--accent-cyan)',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 4px'
+              }}
+            >
+              <Folder size={12} />
+              <span>Google Drive Settings & Folder Link</span>
+            </button>
+            {gdriveConfig.folderUrl && (
+              <button
+                type="button"
+                onClick={() => openGoogleDriveFolder()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-emerald)',
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 4px'
+                }}
+              >
+                <ExternalLink size={12} />
+                <span>Open Backup Folder</span>
+              </button>
+            )}
+          </div>
+        </div>
 
         <button
-          className="btn btn-drive btn-block"
-          style={{ padding: '14px', fontSize: '0.96rem' }}
-          onClick={handleShareToDrive}
+          className="btn btn-ghost btn-block"
+          style={{ padding: '10px', fontSize: '0.84rem', color: 'var(--text-secondary)' }}
+          onClick={handleNativeShare}
           disabled={loadingAction !== null}
         >
-          <Share2 size={18} />
-          {loadingAction === 'share' ? 'Preparing Share Sheet...' : 'Share to Google Drive / Apps'}
+          <Share2 size={16} />
+          {loadingAction === 'share_apps' ? 'Opening Share Menu...' : 'Or Share via Other Apps (WhatsApp, Email...)'}
         </button>
       </div>
 
@@ -274,10 +349,14 @@ export function ExportSharePage() {
               <FolderDown size={14} color="var(--accent-cyan)" />
               <span>Where to find your file on your computer / phone:</span>
             </div>
-            {lastExport.saveLocation === 'chosen_folder' ? (
-              <div>Saved in the folder you selected in the Windows "Save As" window.</div>
+            {lastExport.saveLocation === 'documents_folder' || (lastExport.displayPath && lastExport.displayPath.includes('Documents')) ? (
+              <div>Saved directly to your device inside <strong>Documents/Amortization Tracker/</strong> (<code>{lastExport.displayPath || `Documents/Amortization Tracker/${lastExport.fileName}`}</code>). You can open it anytime from your phone's <strong>Files</strong> or <strong>My Files</strong> app under Documents.</div>
+            ) : lastExport.saveLocation === 'chosen_folder' ? (
+              <div>Saved in the folder you selected in the "Save As" window.</div>
+            ) : lastExport.saveLocation === 'downloads_folder' ? (
+              <div>Saved directly to your device's <strong>Download</strong> folder (<code>/Download/{lastExport.fileName}</code>). Accessible from your phone's <strong>Files</strong> app.</div>
             ) : lastExport.saveLocation === 'device_storage' ? (
-              <div>Saved to device storage in your <strong>Download</strong> folder.</div>
+              <div>Saved to device storage in your <strong>Documents</strong> folder.</div>
             ) : (
               <div>
                 Saved in your PC's <strong>Downloads</strong> folder (e.g. <code>Downloads\{lastExport.fileName}</code>).<br />
@@ -395,14 +474,13 @@ export function ExportSharePage() {
         </div>
       </div>
 
-      {/* Google Drive Connection & Share Modal */}
-      <GoogleDriveShareModal
+      {/* Google Drive Account Sync Modal */}
+      <GoogleDriveModal
         isOpen={isDriveModalOpen}
         onClose={() => setIsDriveModalOpen(false)}
+        accounts={accounts}
+        payments={payments}
         fileName={exportFileName}
-        onDirectDownload={() => handleSaveToDevice()}
-        onShareNative={() => shareDrive(exportFileName)}
-        isCordova={Boolean(window.cordova || (window.plugins && window.plugins.socialsharing) || /android|iphone|ipad/i.test(navigator.userAgent))}
       />
     </div>
   );

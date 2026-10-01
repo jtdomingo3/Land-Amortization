@@ -63,3 +63,8 @@ captures/
 # Test files and scratch outputs
 test_output.xlsx
 *.log
+*.dump
+window_dump.xml
+screen_*.png
+gdrive_*.png
+

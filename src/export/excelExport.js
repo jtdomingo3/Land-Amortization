@@ -318,8 +318,8 @@ export async function saveWithFolderPicker(accounts = [], payments = [], customF
 }
 
 /**
- * Save workbook to device Downloads / Local storage
- * Returns { success, filePath, fileName, blob, blobUrl, saveLocation, message, base64Data, dataUri }
+ * Save workbook to device Documents / Amortization Tracker folder or Downloads
+ * Returns { success, filePath, displayPath, fileName, blob, blobUrl, saveLocation, message, base64Data, dataUri }
  */
 export async function saveWorkbookToDevice(accounts = [], payments = [], customFileName = null) {
   const fileName = getExportFileName(customFileName);
@@ -335,50 +335,102 @@ export async function saveWorkbookToDevice(accounts = [], payments = [], customF
   // 1. Native Cordova Environment on device
   if (window.cordova) {
     let savedFilePath = null;
-    if (window.resolveLocalFileSystemURL && window.cordova.file) {
-      try {
-        const storageDir = window.cordova.file.externalDataDirectory ||
-                           window.cordova.file.dataDirectory ||
-                           window.cordova.file.cacheDirectory;
+    let displayLocation = 'Documents/Amortization Tracker';
+    let saveLocation = 'documents_folder';
 
-        if (storageDir) {
+    if (window.resolveLocalFileSystemURL && window.cordova.file) {
+      const extRoot = window.cordova.file.externalRootDirectory; // file:///storage/emulated/0/
+
+      // Strategy 1: Target /storage/emulated/0/Documents/Amortization Tracker/
+      if (extRoot) {
+        try {
           savedFilePath = await new Promise((resolve, reject) => {
-            window.resolveLocalFileSystemURL(storageDir, (dirEntry) => {
-              dirEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
+            window.resolveLocalFileSystemURL(extRoot, (rootEntry) => {
+              rootEntry.getDirectory('Documents', { create: true, exclusive: false }, (docsEntry) => {
+                docsEntry.getDirectory('Amortization Tracker', { create: true, exclusive: false }, (trackerEntry) => {
+                  trackerEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
+                    fileEntry.createWriter((fileWriter) => {
+                      fileWriter.onwriteend = () => resolve(fileEntry.nativeURL || fileEntry.toURL());
+                      fileWriter.onerror = (e) => reject(e);
+                      fileWriter.write(blob);
+                    }, reject);
+                  }, reject);
+                }, reject);
+              }, reject);
+            }, reject);
+          });
+
+          if (savedFilePath) {
+            displayLocation = `Documents/Amortization Tracker/${fileName}`;
+            saveLocation = 'documents_folder';
+          }
+        } catch (docErr) {
+          console.warn('Could not save to Documents/Amortization Tracker, trying Download folder:', docErr);
+        }
+      }
+
+      // Strategy 2: Target /storage/emulated/0/Download/Amortization Tracker/
+      if (!savedFilePath && extRoot) {
+        try {
+          savedFilePath = await new Promise((resolve, reject) => {
+            window.resolveLocalFileSystemURL(extRoot, (rootEntry) => {
+              rootEntry.getDirectory('Download', { create: true, exclusive: false }, (dlEntry) => {
+                dlEntry.getDirectory('Amortization Tracker', { create: true, exclusive: false }, (trackerEntry) => {
+                  trackerEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
+                    fileEntry.createWriter((fileWriter) => {
+                      fileWriter.onwriteend = () => resolve(fileEntry.nativeURL || fileEntry.toURL());
+                      fileWriter.onerror = (e) => reject(e);
+                      fileWriter.write(blob);
+                    }, reject);
+                  }, reject);
+                }, reject);
+              }, reject);
+            }, reject);
+          });
+
+          if (savedFilePath) {
+            displayLocation = `Download/Amortization Tracker/${fileName}`;
+            saveLocation = 'downloads_folder';
+          }
+        } catch (dlErr) {
+          console.warn('Could not save to Download/Amortization Tracker:', dlErr);
+        }
+      }
+
+      // Strategy 3: Standard app documentsDirectory
+      if (!savedFilePath && window.cordova.file.documentsDirectory) {
+        try {
+          savedFilePath = await new Promise((resolve, reject) => {
+            window.resolveLocalFileSystemURL(window.cordova.file.documentsDirectory, (docsEntry) => {
+              docsEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
                 fileEntry.createWriter((fileWriter) => {
-                  fileWriter.onwriteend = () => {
-                    resolve(fileEntry.nativeURL || fileEntry.toURL());
-                  };
+                  fileWriter.onwriteend = () => resolve(fileEntry.nativeURL || fileEntry.toURL());
                   fileWriter.onerror = (e) => reject(e);
                   fileWriter.write(blob);
                 }, reject);
               }, reject);
             }, reject);
           });
+
+          if (savedFilePath) {
+            displayLocation = `Documents/${fileName}`;
+            saveLocation = 'documents_folder';
+          }
+        } catch (appDocErr) {
+          console.warn('Could not save to cordova.file.documentsDirectory:', appDocErr);
         }
-      } catch (err) {
-        console.warn('Cordova file system write fallback:', err);
       }
     }
 
     const fileTarget = savedFilePath || dataUri;
 
-    // Trigger system share chooser if on device so user can pick where to save
-    if (window.plugins && window.plugins.socialsharing) {
-      window.plugins.socialsharing.shareWithOptions({
-        message: 'Land Amortization Tracker Export',
-        subject: fileName,
-        files: [fileTarget],
-        chooserTitle: 'Save / Export .xlsx File'
-      });
-    }
-
     return {
       success: true,
       filePath: fileTarget,
+      displayPath: displayLocation,
       fileName,
-      saveLocation: 'device_storage',
-      message: `Saved as "${fileName}"! System menu opened to choose save location.`,
+      saveLocation,
+      message: `Saved directly to ${displayLocation}`,
       blob,
       base64Data,
       dataUri
@@ -391,6 +443,7 @@ export async function saveWorkbookToDevice(accounts = [], payments = [], customF
   return {
     success: true,
     filePath: fileName,
+    displayPath: `Downloads/${fileName}`,
     fileName: fileName,
     blob,
     base64Data,
