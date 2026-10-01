@@ -1,4 +1,4 @@
-# Cortez Land Amortization Collection Tracker
+# Land Amortization Collection Tracker
 
 A multi-platform financial tracking and amortization management system for real estate land sales and installment collections. Built to replicate the calculation engine, penalty formulas, multi-slip official receipts, statements of account (SOA), 5-sheet tabular Excel exports, and cloud synchronization across mobile and desktop.
 
@@ -17,7 +17,9 @@ Land Amortization/
 ```
 
 ### 1. `land_amortization_pc/` (Windows PC Desktop Edition)
+
 A native desktop application optimized for finance officers, accountants, and office staff.
+
 - **Tech Stack**: Electron, React 19, Vite (`vite-plugin-electron`), embedded `better-sqlite3`, SheetJS, Lucide Icons, Oxlint.
 - **Database**: 100% offline embedded local SQLite (`%APPDATA%\Roaming\land_amortization_pc\land_amortization.db`).
 - **Custom In-App Print Previewers**: Bypasses broken Chromium/Windows print preview dialogs with built-in interactive paper preview (zoom 50%–150%, fit width, slip navigation, and direct printing).
@@ -31,7 +33,9 @@ A native desktop application optimized for finance officers, accountants, and of
 - **Developer Mode & Diagnostics**: Integrated keyboard shortcuts (`F12`, `Ctrl+Shift+I` for DevTools, `F5` or `Ctrl+R` for reload), terminal console error forwarding, and `<ErrorBoundary>` crash protection.
 
 ### 2. `land_amortization-android/` (Android Mobile Edition)
+
 The portable field collection app for mobile agents, site managers, and collectors.
+
 - **Tech Stack**: Apache Cordova (Android 14+), React 19, Vite, SQLite (`cordova-sqlite-storage`), Lucide Icons.
 - **Database**: 100% offline embedded SQLite database with schema migrations.
 - **Native Android Sharing**: Share receipts, SOA, and `.xlsx` workbooks directly via Google Drive, WhatsApp, Gmail, Bluetooth, and Messenger with FileProvider permissions.
@@ -41,17 +45,17 @@ The portable field collection app for mobile agents, site managers, and collecto
 
 ## Platform Feature Matrix
 
-| Feature | Windows PC Desktop (`land_amortization_pc`) | Android Mobile (`land_amortization-android`) |
-|---|:---:|:---:|
-| **Offline SQLite Engine** | `better-sqlite3` (High Performance) | `cordova-sqlite-storage` |
-| **Financial Waterfall Math** | Yes | Yes |
-| **Official Receipts (OR)** | Yes (In-App Print Preview + 2 Slips/Page) | Yes (Mobile PDF / Print) |
-| **Statement of Account (SOA)** | Yes (Interactive Zoom & Filtered Ledger) | Yes (Full & Period Filtered) |
-| **Direct OS Printing** | Yes (Silent Background Print Pipeline) | Yes (Android Print Spooler) |
-| **Tabular 5-Sheet Excel Export** | Yes (Direct to `Documents\Amortization Tracker`) | Yes (Saved to `Downloads`) |
-| **Google Drive Integration** | Yes (Desktop Browser + Folder Link) | Yes (Native Android Share Intent) |
-| **Supabase Cloud Sync** | Yes (Configurable in Settings) | Yes (Direct Sync) |
-| **Developer Tools (`F12`)** | Yes (`F12` / `Ctrl+Shift+I`) | Chrome Remote Inspect |
+| Feature                                |   Windows PC Desktop (`land_amortization_pc`)   | Android Mobile (`land_amortization-android`) |
+| -------------------------------------- | :-----------------------------------------------: | :--------------------------------------------: |
+| **Offline SQLite Engine**        |       `better-sqlite3` (High Performance)       |           `cordova-sqlite-storage`           |
+| **Financial Waterfall Math**     |                        Yes                        |                      Yes                      |
+| **Official Receipts (OR)**       |     Yes (In-App Print Preview + 2 Slips/Page)     |            Yes (Mobile PDF / Print)            |
+| **Statement of Account (SOA)**   |     Yes (Interactive Zoom & Filtered Ledger)     |          Yes (Full & Period Filtered)          |
+| **Direct OS Printing**           |      Yes (Silent Background Print Pipeline)      |          Yes (Android Print Spooler)          |
+| **Tabular 5-Sheet Excel Export** | Yes (Direct to`Documents\Amortization Tracker`) |          Yes (Saved to`Downloads`)          |
+| **Google Drive Integration**     |        Yes (Desktop Browser + Folder Link)        |       Yes (Native Android Share Intent)       |
+| **Supabase Cloud Sync**          |          Yes (Configurable in Settings)          |               Yes (Direct Sync)               |
+| **Developer Tools (`F12`)**    |         Yes (`F12` / `Ctrl+Shift+I`)         |             Chrome Remote Inspect             |
 
 ---
 
@@ -89,6 +93,7 @@ npm start
 ```
 
 #### PC Developer Mode Shortcuts
+
 - **`F12`** or **`Ctrl + Shift + I`**: Toggle Chrome Developer Tools & Console.
 - **`F5`** or **`Ctrl + R`**: Refresh and reload the application.
 
