@@ -340,7 +340,30 @@ export async function saveWorkbookToDevice(accounts = [], payments = [], customF
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 
-  // 1. Electron Desktop Environment: Native Windows Save File Dialog
+  // 1. Electron Desktop Environment: Direct save to My Documents > Amortization Tracker > ExcelFile
+  if (typeof window !== 'undefined' && window.electronAPI?.excel?.saveDirect) {
+    try {
+      const res = await window.electronAPI.excel.saveDirect(fileName, base64Data);
+      if (res && res.success) {
+        return {
+          success: true,
+          filePath: res.filePath,
+          displayPath: res.displayPath,
+          directory: res.directory,
+          fileName: res.fileName || fileName,
+          saveLocation: 'documents_amortization_tracker_excelfile',
+          message: `Saved to My Documents > Amortization Tracker > ExcelFile > ${res.fileName}`,
+          blob,
+          base64Data,
+          dataUri
+        };
+      }
+    } catch (directErr) {
+      console.warn('Electron saveDirect error, falling back to dialog:', directErr);
+    }
+  }
+
+  // Fallback to Native Windows Save File Dialog (pre-routed to ExcelFile folder)
   if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.dialog) {
     try {
       const res = await window.electronAPI.dialog.saveFile({
@@ -353,10 +376,11 @@ export async function saveWorkbookToDevice(accounts = [], payments = [], customF
         return {
           success: true,
           filePath: res.filePath,
-          displayPath: res.filePath,
+          displayPath: res.displayPath || res.filePath,
+          directory: res.directory,
           fileName: res.fileName || fileName,
           saveLocation: 'windows_file_dialog',
-          message: `Saved successfully to ${res.filePath}`,
+          message: `Saved successfully to ${res.displayPath || res.filePath}`,
           blob,
           base64Data,
           dataUri

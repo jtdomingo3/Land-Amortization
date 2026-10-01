@@ -7,28 +7,100 @@ import {
   FileSpreadsheet,
   X,
   Smartphone,
-  Laptop
+  Laptop,
+  FolderOpen,
+  Folder,
+  Globe,
+  Sparkles
 } from 'lucide-react';
+import { getGoogleDriveConfig } from '../services/googleDriveService.js';
 
 export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative, onDirectDownload, isCordova }) {
   const [downloadTriggered, setDownloadTriggered] = useState(false);
+  const [savedFileInfo, setSavedFileInfo] = useState(null);
+  const [statusNotice, setStatusNotice] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleOpenGoogleDrive = () => {
-    if (onDirectDownload) {
-      onDirectDownload();
-      setDownloadTriggered(true);
+  // Helper to ensure file is saved to My Documents > Amortization Tracker > ExcelFile
+  const ensureFileSaved = async () => {
+    if (savedFileInfo && savedFileInfo.filePath) {
+      return savedFileInfo;
     }
-    window.open('https://drive.google.com/drive/my-drive', '_blank');
+    if (onDirectDownload) {
+      setIsProcessing(true);
+      try {
+        const res = await onDirectDownload();
+        if (res) {
+          setSavedFileInfo(res);
+          setDownloadTriggered(true);
+          return res;
+        }
+      } catch (e) {
+        console.warn('Error saving file:', e);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+    return null;
   };
 
-  const handleOpenGoogleSheets = () => {
-    if (onDirectDownload) {
-      onDirectDownload();
-      setDownloadTriggered(true);
+  const handleOpenGoogleDrive = async () => {
+    const fileRes = await ensureFileSaved();
+    const config = getGoogleDriveConfig();
+    const targetUrl = (config && config.folderUrl && config.folderUrl.trim())
+      ? config.folderUrl.trim()
+      : 'https://drive.google.com/drive/my-drive';
+
+    try {
+      if (typeof window !== 'undefined' && window.electronAPI?.shell?.openExternal) {
+        await window.electronAPI.shell.openExternal(targetUrl);
+      } else {
+        window.open(targetUrl, '_blank');
+      }
+      setStatusNotice('Google Drive opened in your web browser! Drag and drop your saved Excel file into your Google Drive folder.');
+    } catch (err) {
+      console.warn('Could not open drive url:', err);
+      window.open(targetUrl, '_blank');
     }
-    window.open('https://sheets.new', '_blank');
+  };
+
+  const handleOpenInExcel = async () => {
+    const fileRes = await ensureFileSaved();
+    const path = fileRes?.filePath || savedFileInfo?.filePath;
+    if (path && window.electronAPI?.shell?.openPath) {
+      await window.electronAPI.shell.openPath(path);
+      setStatusNotice('Opening Excel file with your desktop spreadsheet app...');
+    } else {
+      setStatusNotice('File saved. You can locate it in your ExcelFile folder.');
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    const fileRes = await ensureFileSaved();
+    const path = fileRes?.filePath || savedFileInfo?.filePath;
+    if (path && window.electronAPI?.shell?.showItemInFolder) {
+      window.electronAPI.shell.showItemInFolder(path);
+      setStatusNotice('Opened Amortization Tracker folder in Windows File Explorer.');
+    } else if (window.electronAPI?.excel?.getExcelDir) {
+      const dir = await window.electronAPI.excel.getExcelDir();
+      window.electronAPI.shell.openPath(dir);
+      setStatusNotice('Opened Amortization Tracker folder in Windows File Explorer.');
+    } else {
+      setStatusNotice('File saved to Documents > Amortization Tracker > ExcelFile.');
+    }
+  };
+
+  const handleOpenGoogleSheetsWeb = async () => {
+    // Instead of sheets.new (which opens a blank empty spreadsheet), open Google Sheets web app
+    const sheetsUrl = 'https://docs.google.com/spreadsheets/u/0/';
+    if (window.electronAPI?.shell?.openExternal) {
+      await window.electronAPI.shell.openExternal(sheetsUrl);
+    } else {
+      window.open(sheetsUrl, '_blank');
+    }
+    setStatusNotice('Google Sheets Web opened! In Google Sheets, click the Folder icon > Upload to import your file.');
   };
 
   const handleNativeShare = async () => {
@@ -37,20 +109,22 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
     }
   };
 
+  const displayFilePath = savedFileInfo?.displayPath || savedFileInfo?.filePath || 'My Documents\\Amortization Tracker\\ExcelFile\\' + (fileName || 'Land_Amortization_Tracker.xlsx');
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
       <div
         className="modal-content glass-card"
         onClick={e => e.stopPropagation()}
         style={{
-          maxWidth: 480,
-          width: '92%',
-          padding: '24px 20px',
+          maxWidth: 520,
+          width: '94%',
+          padding: '24px 22px',
           borderRadius: 16,
           background: 'var(--bg-card)',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
           border: '1px solid var(--border-color)',
-          maxHeight: '90vh',
+          maxHeight: '92vh',
           overflowY: 'auto'
         }}
       >
@@ -65,14 +139,15 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff'
+              color: '#fff',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
             }}>
               <CloudUpload size={22} />
             </div>
             <div>
               <h3 style={{ fontSize: '1.08rem', fontWeight: 800 }}>Save to Google Drive</h3>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                Upload 5-sheet report to your Google account
+                Backup 5-sheet amortization report to your Google account
               </div>
             </div>
           </div>
@@ -101,7 +176,7 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <FileSpreadsheet size={16} color="var(--accent-emerald)" />
             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Export File:
+              Report File:
             </span>
           </div>
           <div style={{
@@ -114,11 +189,11 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
             {fileName || 'Land_Amortization_Tracker.xlsx'}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
-            Contains 5 sheets: Dashboard, Land Accounts, Payments, Monthly Waterfall & Rules.
+            Contains 5 complete sheets: Dashboard, Land Accounts, Payments, Monthly Waterfall & Rules.
           </div>
         </div>
 
-        {/* Android Native vs Web Preview Explanation */}
+        {/* Explanation Card */}
         {isCordova ? (
           <div style={{
             background: 'rgba(16, 185, 129, 0.08)',
@@ -147,16 +222,16 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: 4 }}>
               <Laptop size={16} />
-              <span>Google Account Connection</span>
+              <span>Google Drive Desktop Workflow</span>
             </div>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              To upload to Google Drive without needing developer API keys, tap <strong>Open Google Drive</strong> below. Your file will be saved to your computer, and Google Drive will open so you can drop it straight into your Drive.
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+              Click <strong>Open Google Drive</strong> below to launch Google Drive in your web browser. Your file will automatically be saved to <strong>My Documents &gt; Amortization Tracker &gt; ExcelFile</strong> so you can drag and drop it straight into your Drive folder.
             </div>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
           {isCordova ? (
             <button
               className="btn btn-drive btn-block"
@@ -168,52 +243,166 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
             </button>
           ) : (
             <>
+              {/* Button 1: Open Google Drive */}
               <button
                 className="btn btn-drive btn-block"
-                style={{ padding: '14px', fontSize: '0.95rem' }}
+                style={{
+                  padding: '14px',
+                  fontSize: '0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                }}
                 onClick={handleOpenGoogleDrive}
+                disabled={isProcessing}
               >
                 <ExternalLink size={18} />
-                Open Google Drive (drive.google.com)
+                <span>{isProcessing ? 'Saving & Opening...' : 'Open Google Drive (drive.google.com)'}</span>
               </button>
 
+              {/* Button 2: Open in Microsoft Excel (Replaces useless sheets.new empty sheet) */}
               <button
                 className="btn btn-secondary btn-block"
-                style={{ padding: '12px', fontSize: '0.88rem' }}
-                onClick={handleOpenGoogleSheets}
+                style={{
+                  padding: '12px 14px',
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontWeight: 600,
+                  borderRadius: 10
+                }}
+                onClick={handleOpenInExcel}
+                disabled={isProcessing}
               >
-                <FileSpreadsheet size={16} color="var(--accent-emerald)" />
-                Open in Google Sheets (sheets.new)
+                <FileSpreadsheet size={17} color="var(--accent-emerald)" />
+                <span>Open in Microsoft Excel (Desktop)</span>
+              </button>
+
+              {/* Button 3: Open Excel Folder in Windows Explorer */}
+              <button
+                className="btn btn-secondary btn-block"
+                style={{
+                  padding: '12px 14px',
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontWeight: 600,
+                  borderRadius: 10
+                }}
+                onClick={handleOpenFolder}
+                disabled={isProcessing}
+              >
+                <FolderOpen size={17} color="var(--accent-cyan)" />
+                <span>Open Folder in File Explorer</span>
               </button>
             </>
           )}
 
+          {/* Button 4: Save / Download file */}
           <button
-            className="btn btn-primary btn-block"
-            style={{ padding: '12px', fontSize: '0.88rem' }}
-            onClick={() => {
-              if (onDirectDownload) onDirectDownload();
-              setDownloadTriggered(true);
+            className="btn btn-secondary btn-block"
+            style={{
+              padding: '11px',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              borderRadius: 10
             }}
+            onClick={async () => {
+              await ensureFileSaved();
+              setStatusNotice('File saved to Documents > Amortization Tracker > ExcelFile.');
+            }}
+            disabled={isProcessing}
           >
-            <Download size={16} />
-            Download .xlsx File to Storage
+            <Download size={15} />
+            <span>Save .xlsx to Amortization Tracker Folder</span>
           </button>
         </div>
 
-        {downloadTriggered && (
+        {/* Status / Saved File Banner */}
+        {(downloadTriggered || savedFileInfo) && (
           <div style={{
             background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            fontSize: '0.76rem',
+            color: 'var(--accent-emerald-light)',
+            marginBottom: 12
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 4 }}>
+              <CheckCircle2 size={16} color="var(--accent-emerald)" />
+              <span>Excel File Saved:</span>
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '0.72rem', wordBreak: 'break-all', opacity: 0.9 }}>
+              {displayFilePath}
+            </div>
+          </div>
+        )}
+
+        {/* Status Notice */}
+        {statusNotice && (
+          <div style={{
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
             borderRadius: 8,
             padding: '8px 12px',
-            fontSize: '0.74rem',
-            color: 'var(--accent-emerald-light)',
+            fontSize: '0.75rem',
+            color: 'var(--accent-cyan)',
+            marginBottom: 12
+          }}>
+            {statusNotice}
+          </div>
+        )}
+
+        {/* Google Sheets Web Helper Link (Instead of sheets.new empty sheet) */}
+        {!isCordova && (
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6
+            justifyContent: 'center',
+            gap: 6,
+            paddingTop: 4,
+            borderTop: '1px solid var(--border-color)',
+            marginTop: 4
           }}>
-            <CheckCircle2 size={14} />
-            <span>File saved to your Downloads folder!</span>
+            <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+              Want to view in Google Sheets?
+            </span>
+            <button
+              type="button"
+              onClick={handleOpenGoogleSheetsWeb}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--accent-emerald)',
+                fontSize: '0.73rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 4px',
+                fontWeight: 600,
+                textDecoration: 'underline'
+              }}
+            >
+              <Globe size={13} />
+              <span>Open Google Sheets Web App</span>
+            </button>
           </div>
         )}
       </div>

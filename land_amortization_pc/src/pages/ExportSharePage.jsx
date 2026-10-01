@@ -379,37 +379,62 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
             borderRadius: 6,
             marginBottom: 10
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
               <FolderDown size={14} color="var(--accent-cyan)" />
-              <span>Where to find your file on your computer / phone:</span>
+              <span>File Storage Location:</span>
             </div>
-            {lastExport.saveLocation === 'documents_folder' || (lastExport.displayPath && lastExport.displayPath.includes('Documents')) ? (
-              <div>Saved directly to your device inside <strong>Documents/Amortization Tracker/</strong> (<code>{lastExport.displayPath || `Documents/Amortization Tracker/${lastExport.fileName}`}</code>). You can open it anytime from your phone's <strong>Files</strong> or <strong>My Files</strong> app under Documents.</div>
-            ) : lastExport.saveLocation === 'chosen_folder' ? (
-              <div>Saved in the folder you selected in the "Save As" window.</div>
-            ) : lastExport.saveLocation === 'downloads_folder' ? (
-              <div>Saved directly to your device's <strong>Download</strong> folder (<code>/Download/{lastExport.fileName}</code>). Accessible from your phone's <strong>Files</strong> app.</div>
-            ) : lastExport.saveLocation === 'device_storage' ? (
-              <div>Saved to device storage in your <strong>Documents</strong> folder.</div>
-            ) : (
-              <div>
-                Saved in your PC's <strong>Downloads</strong> folder (e.g. <code>Downloads\{lastExport.fileName}</code>).<br />
-                💡 Shortcut: Press <strong>Ctrl + J</strong> in your browser to immediately see and open downloaded files.
-              </div>
-            )}
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+              Saved to: <strong>My Documents &gt; Amortization Tracker &gt; ExcelFile</strong>
+              {lastExport.filePath && (
+                <div style={{ marginTop: 4 }}>
+                  <code style={{ fontSize: '0.72rem', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: 4, wordBreak: 'break-all' }}>
+                    {lastExport.filePath}
+                  </code>
+                </div>
+              )}
+            </div>
           </div>
 
-          {lastExport.blobUrl && (
-            <a
-              href={lastExport.blobUrl}
-              download={lastExport.fileName}
-              className="btn btn-primary btn-block"
-              style={{ padding: '10px 14px', fontSize: '0.86rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-            >
-              <Download size={15} />
-              Click here to directly open / re-download "{lastExport.fileName}"
-            </a>
-          )}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {lastExport.filePath && typeof window !== 'undefined' && window.electronAPI?.shell && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '9px 14px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={() => window.electronAPI.shell.openPath(lastExport.filePath)}
+                >
+                  <FileSpreadsheet size={15} />
+                  <span>Open Excel File</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '9px 14px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={() => {
+                    const dir = lastExport.directory || (lastExport.filePath ? lastExport.filePath.substring(0, lastExport.filePath.lastIndexOf('\\')) : '');
+                    if (dir) window.electronAPI.shell.openPath(dir);
+                    else window.electronAPI.shell.showItemInFolder(lastExport.filePath);
+                  }}
+                >
+                  <Folder size={15} color="var(--accent-cyan)" />
+                  <span>Open Folder</span>
+                </button>
+              </>
+            )}
+
+            {lastExport.blobUrl && (typeof window === 'undefined' || !window.electronAPI) && (
+              <a
+                href={lastExport.blobUrl}
+                download={lastExport.fileName}
+                className="btn btn-primary btn-block"
+                style={{ padding: '10px 14px', fontSize: '0.86rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <Download size={15} />
+                Download "{lastExport.fileName}"
+              </a>
+            )}
+          </div>
         </div>
       )}
 

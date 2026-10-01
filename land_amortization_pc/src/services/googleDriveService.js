@@ -34,6 +34,10 @@ export function openGoogleDriveFolder(customUrl = null) {
   const targetUrl = customUrl || config.folderUrl || 'https://drive.google.com/drive/my-drive';
   
   try {
+    if (typeof window !== 'undefined' && window.electronAPI?.shell?.openExternal) {
+      window.electronAPI.shell.openExternal(targetUrl);
+      return;
+    }
     if (window.cordova) {
       window.open(targetUrl, '_system');
     } else {

@@ -22,5 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   print: {
     printHtml: (html, options) => ipcRenderer.invoke('print:html', html, options),
     toPdf: (html, options) => ipcRenderer.invoke('print:toPdf', html, options)
+  },
+  excel: {
+    saveDirect: (fileName, data) => ipcRenderer.invoke('excel:saveDirect', fileName, data),
+    getExcelDir: () => ipcRenderer.invoke('excel:getExcelDir')
   }
 });

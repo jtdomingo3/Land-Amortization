@@ -239,27 +239,33 @@ export function AppProvider({ children }) {
 
   const handleExportExcel = async (customFileName) => {
     const res = await saveWorkbookToDevice(rawAccounts, rawPayments, customFileName);
-    await addExportLog({
-      export_type: 'local_save',
-      file_name: res.fileName,
-      accounts_exported: rawAccounts.length,
-      payments_exported: rawPayments.length
-    });
-    const logs = await getExportLogs();
-    setExportLogs(logs);
+    if (res && res.success && !res.canceled) {
+      const safeName = res.fileName || customFileName || `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+      await addExportLog({
+        export_type: 'local_save',
+        file_name: safeName,
+        accounts_exported: rawAccounts.length,
+        payments_exported: rawPayments.length
+      });
+      const logs = await getExportLogs();
+      setExportLogs(logs);
+    }
     return res;
   };
 
   const handleShareDrive = async (customFileName) => {
     const res = await shareToGoogleDrive(rawAccounts, rawPayments, customFileName);
-    await addExportLog({
-      export_type: 'share_google_drive',
-      file_name: res.fileName,
-      accounts_exported: rawAccounts.length,
-      payments_exported: rawPayments.length
-    });
-    const logs = await getExportLogs();
-    setExportLogs(logs);
+    if (res && res.success && !res.canceled) {
+      const safeName = res.fileName || customFileName || `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+      await addExportLog({
+        export_type: 'share_google_drive',
+        file_name: safeName,
+        accounts_exported: rawAccounts.length,
+        payments_exported: rawPayments.length
+      });
+      const logs = await getExportLogs();
+      setExportLogs(logs);
+    }
     return res;
   };
 

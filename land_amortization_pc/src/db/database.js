@@ -544,9 +544,12 @@ export async function getExportLogs() {
 }
 
 export async function addExportLog({ export_type, file_name, accounts_exported, payments_exported }) {
+  const safeFileName = file_name || `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+  const safeExportType = export_type || 'local_save';
+
   const item = {
-    export_type,
-    file_name,
+    export_type: safeExportType,
+    file_name: safeFileName,
     accounts_exported: accounts_exported || 0,
     payments_exported: payments_exported || 0,
     created_at: new Date().toISOString()
@@ -562,7 +565,7 @@ export async function addExportLog({ export_type, file_name, accounts_exported, 
 
   await runSql(
     'INSERT INTO export_log (export_type, file_name, accounts_exported, payments_exported) VALUES (?, ?, ?, ?)',
-    [export_type, file_name, accounts_exported, payments_exported]
+    [safeExportType, safeFileName, accounts_exported || 0, payments_exported || 0]
   );
   return item;
 }

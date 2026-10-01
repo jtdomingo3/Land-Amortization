@@ -99,7 +99,7 @@ export function DashboardPage() {
           disabled={isSharing}
         >
           <CloudUpload size={15} />
-          {isSharing ? 'Sharing...' : 'Share to Drive'}
+          {isSharing ? 'Saving...' : 'Save to Drive'}
         </button>
       </div>
 

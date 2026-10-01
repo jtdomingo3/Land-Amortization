@@ -21,21 +21,23 @@ export async function shareToGoogleDrive(accounts, payments, customFileName = nu
     const shareTarget = filePath || dataUri;
     const config = getGoogleDriveConfig();
 
-    // 0. Electron Desktop Environment: Reveal in File Explorer & optional Drive link
+    // 0. Electron Desktop Environment: Open Google Drive in Default Browser (Do NOT force Windows Explorer)
     if (typeof window !== 'undefined' && window.electronAPI) {
-      if (filePath && window.electronAPI.shell) {
-        window.electronAPI.shell.showItemInFolder(filePath);
+      const targetUrl = (config && config.folderUrl && config.folderUrl.trim())
+        ? config.folderUrl.trim()
+        : 'https://drive.google.com/drive/my-drive';
+
+      if (window.electronAPI.shell?.openExternal) {
+        await window.electronAPI.shell.openExternal(targetUrl);
       }
-      if (config && config.folderUrl && window.electronAPI.shell) {
-        window.electronAPI.shell.openExternal(config.folderUrl);
-      }
+
       return {
         success: true,
-        method: 'electron_desktop',
-        message: `Report exported successfully to ${displayPath || filePath}! File highlighted in Windows Explorer.`,
+        method: 'electron_desktop_drive',
+        message: `Google Drive opened in your web browser! Your Excel file is saved to My Documents > Amortization Tracker > ExcelFile > ${fileName}.`,
         fileName,
         filePath,
-        displayPath,
+        displayPath: displayPath || filePath,
         blobUrl
       };
     }

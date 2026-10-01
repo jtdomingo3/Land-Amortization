@@ -81,7 +81,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
   const [copiedScript, setCopiedScript] = useState(false);
 
   const handleCopyScript = () => {
-    const targetFolderId = extractFolderId(folderUrl) || '1YarYj_0Cjr7dgYp9MU2YYXivjnbdbv1m';
+    const targetFolderId = extractFolderId(folderUrl) || 'YOUR_GOOGLE_DRIVE_FOLDER_ID';
     const code = generateAppsScriptCode(targetFolderId);
     navigator.clipboard.writeText(code);
     setCopiedScript(true);
@@ -278,22 +278,6 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
               Google Drive Folder Link
             </label>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                onClick={() => setFolderUrl('https://drive.google.com/drive/folders/1YarYj_0Cjr7dgYp9MU2YYXivjnbdbv1m?usp=drive_link')}
-                style={{
-                  background: 'rgba(6, 182, 212, 0.12)',
-                  border: '1px solid rgba(6, 182, 212, 0.3)',
-                  color: 'var(--accent-cyan)',
-                  fontSize: '0.7rem',
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  cursor: 'pointer'
-                }}
-                title="Fill with provided test folder link"
-              >
-                Insert Test Link
-              </button>
               {folderUrl && (
                 <button
                   type="button"

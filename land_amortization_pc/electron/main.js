@@ -97,8 +97,12 @@ function setupIpcHandlers() {
   // Run (INSERT, UPDATE, DELETE)
   ipcMain.handle('sqlite:run', async (_event, sql, params = []) => {
     if (!db) throw new Error('Database not initialized');
+    let safeParams = (Array.isArray(params) ? params : [params]).map(p => (p === undefined ? null : p));
+    if (sql.includes('INSERT INTO export_log') && (safeParams[1] === null || safeParams[1] === undefined || safeParams[1] === '')) {
+      safeParams[1] = `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+    }
     const stmt = db.prepare(sql);
-    const result = Array.isArray(params) ? stmt.run(...params) : stmt.run(params);
+    const result = stmt.run(...safeParams);
     return {
       lastInsertRowid: Number(result.lastInsertRowid),
       changes: result.changes
@@ -112,9 +116,24 @@ function setupIpcHandlers() {
     return true;
   });
 
+  function getExcelDir() {
+    const documentsPath = app.getPath('documents');
+    const excelDir = path.join(documentsPath, 'Amortization Tracker', 'ExcelFile');
+    if (!fs.existsSync(excelDir)) {
+      fs.mkdirSync(excelDir, { recursive: true });
+    }
+    return excelDir;
+  }
+
   // Native Save File Dialog for Excel/PDF exports
   ipcMain.handle('dialog:saveFile', async (_event, options = {}, fileData) => {
-    const { title = 'Save File', defaultPath = 'land_amortization_report.xlsx', filters = [] } = options;
+    const excelDir = getExcelDir();
+    let defaultPath = options.defaultPath || 'land_amortization_report.xlsx';
+    if (!path.isAbsolute(defaultPath)) {
+      defaultPath = path.join(excelDir, path.basename(defaultPath));
+    }
+
+    const { title = 'Save File', filters = [] } = options;
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
       title,
       defaultPath,
@@ -132,7 +151,7 @@ function setupIpcHandlers() {
           const base64Data = fileData.split(',')[1];
           buffer = Buffer.from(base64Data, 'base64');
         } else {
-          buffer = Buffer.from(fileData, 'utf-8');
+          buffer = Buffer.from(fileData, 'base64');
         }
       } else if (fileData instanceof Uint8Array || Buffer.isBuffer(fileData)) {
         buffer = Buffer.from(fileData);
@@ -144,12 +163,53 @@ function setupIpcHandlers() {
       return {
         success: true,
         filePath,
-        fileName: path.basename(filePath)
+        fileName: path.basename(filePath),
+        directory: path.dirname(filePath),
+        displayPath: `My Documents > Amortization Tracker > ExcelFile > ${path.basename(filePath)}`
       };
     } catch (err) {
       console.error('[Dialog] Save file error:', err);
       return { success: false, error: err.message };
     }
+  });
+
+  // Direct save to My Documents > Amortization Tracker > ExcelFile
+  ipcMain.handle('excel:saveDirect', async (_event, fileName, fileData) => {
+    try {
+      const excelDir = getExcelDir();
+      const safeName = path.basename(fileName || 'land_amortization_report.xlsx');
+      const filePath = path.join(excelDir, safeName);
+
+      let buffer;
+      if (typeof fileData === 'string') {
+        if (fileData.startsWith('data:')) {
+          const base64Data = fileData.split(',')[1];
+          buffer = Buffer.from(base64Data, 'base64');
+        } else {
+          buffer = Buffer.from(fileData, 'base64');
+        }
+      } else if (fileData instanceof Uint8Array || Buffer.isBuffer(fileData)) {
+        buffer = Buffer.from(fileData);
+      } else {
+        buffer = Buffer.from(fileData);
+      }
+
+      await fs.promises.writeFile(filePath, buffer);
+      return {
+        success: true,
+        filePath,
+        fileName: safeName,
+        directory: excelDir,
+        displayPath: `My Documents > Amortization Tracker > ExcelFile > ${safeName}`
+      };
+    } catch (err) {
+      console.error('[Excel] Direct save error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('excel:getExcelDir', async () => {
+    return getExcelDir();
   });
 
   // Open path in Windows File Explorer
@@ -386,6 +446,14 @@ function createWindow() {
 
   // Remove default menu bar for clean modern Windows desktop look
   mainWindow.removeMenu();
+
+  // Route any window.open / target="_blank" links safely into Windows default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();

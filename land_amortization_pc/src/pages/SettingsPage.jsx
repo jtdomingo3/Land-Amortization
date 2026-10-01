@@ -53,6 +53,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   const [isTestingSb, setIsTestingSb] = useState(false);
   const [isSyncingSb, setIsSyncingSb] = useState(false);
   const [showSbKey, setShowSbKey] = useState(false);
+  const [showSbUrl, setShowSbUrl] = useState(false);
   const [showSchema, setShowSchema] = useState(false);
   const [copiedSchema, setCopiedSchema] = useState(false);
 
@@ -594,23 +595,43 @@ export function SettingsPage({ defaultOpenHelp = false }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, marginBottom: 14 }}>
           <div className="form-group">
             <label className="form-label" style={{ fontSize: '0.76rem' }}>Supabase Project URL</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="https://your-project-id.supabase.co"
-              value={sbConfig.url}
-              onChange={e => setSbConfig(prev => ({ ...prev, url: e.target.value }))}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showSbUrl ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingRight: 36 }}
+                placeholder="https://your-project-id.supabase.co"
+                value={sbConfig.url}
+                onChange={e => setSbConfig(prev => ({ ...prev, url: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSbUrl(!showSbUrl)}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+                title={showSbUrl ? 'Hide Project URL' : 'Show Project URL'}
+              >
+                {showSbUrl ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.76rem' }}>Supabase Secret API Key</label>
+            <label className="form-label" style={{ fontSize: '0.76rem' }}>Supabase API Key</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showSbKey ? 'text' : 'password'}
                 className="form-input"
                 style={{ paddingRight: 36 }}
-                placeholder="sb_secret_... or service key"
+                placeholder="sb_publishable_... or API key"
                 value={sbConfig.key}
                 onChange={e => setSbConfig(prev => ({ ...prev, key: e.target.value }))}
               />
@@ -627,6 +648,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                   color: 'var(--text-muted)',
                   cursor: 'pointer'
                 }}
+                title={showSbKey ? 'Hide API Key' : 'Show API Key'}
               >
                 {showSbKey ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
