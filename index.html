@@ -14,14 +14,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Load cordova.js when running in native Cordova environment
-      if (window.location.protocol === 'file:' || window.cordova) {
-        var cordovaScript = document.createElement('script');
-        cordovaScript.src = 'cordova.js';
-        document.head.appendChild(cordovaScript);
-      }
-    </script>
+    <script src="cordova.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

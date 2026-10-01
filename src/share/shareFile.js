@@ -12,15 +12,16 @@ import { saveWorkbookToDevice } from '../export/excelExport.js';
 export async function shareToGoogleDrive(accounts, payments, customFileName = null) {
   try {
     const saveResult = await saveWorkbookToDevice(accounts, payments, customFileName);
-    const { filePath, fileName, blob, blobUrl } = saveResult;
+    const { filePath, fileName, blob, blobUrl, dataUri } = saveResult;
+    const shareTarget = filePath || dataUri;
 
     // 1. Cordova Android native share
     if (window.plugins && window.plugins.socialsharing) {
       return new Promise((resolve) => {
         const options = {
-          message: 'Land Amortization Tracker - Full Backup & Excel Report',
+          message: 'Land Amortization Tracker - 5-Sheet Excel Report',
           subject: fileName,
-          files: [filePath],
+          files: [shareTarget],
           chooserTitle: 'Save to Google Drive or Share via...'
         };
 
@@ -30,7 +31,7 @@ export async function shareToGoogleDrive(accounts, payments, customFileName = nu
             console.log('Share completed:', result);
             resolve({
               success: true,
-              message: `Shared "${fileName}" successfully! Select Google Drive in the share menu to upload.`,
+              message: `Select "Save to Drive" in the share menu to upload "${fileName}" directly to your Google account.`,
               fileName,
               blobUrl
             });

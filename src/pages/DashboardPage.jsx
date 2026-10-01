@@ -19,18 +19,19 @@ import {
   CreditCard,
   CloudUpload,
   TrendingUp,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 
 export function DashboardPage() {
-  const { dashboard, accounts, payments, setActiveTab, setSelectedAccountId, addAccount, addPayment, shareDrive, exportExcel } = useApp();
+  const { dashboard, accounts, payments, setActiveTab, setSelectedAccountId, addAccount, addPayment, shareDrive, exportExcel, resetSample } = useApp();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
   const handleShareClick = async () => {
-    if (window.cordova && window.plugins && window.plugins.socialsharing) {
+    if (window.cordova || (window.plugins && window.plugins.socialsharing)) {
       try {
         setIsSharing(true);
         await shareDrive();
@@ -83,6 +84,56 @@ export function DashboardPage() {
           {isSharing ? 'Sharing...' : 'Share to Drive'}
         </button>
       </div>
+
+      {/* Empty State Banner if 0 Accounts */}
+      {accounts.length === 0 && (
+        <div className="glass-card" style={{
+          textAlign: 'center',
+          padding: '24px 16px',
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.08))',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          borderRadius: 14
+        }}>
+          <div style={{
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, var(--accent-emerald), var(--accent-cyan))',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            marginBottom: 12
+          }}>
+            <Sparkles size={24} />
+          </div>
+          <h3 style={{ fontSize: '1.08rem', fontWeight: 800, marginBottom: 6 }}>
+            Ready to Track Land Amortizations
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto 16px auto', lineHeight: 1.45 }}>
+            Your database is fresh and empty. Start creating your buyer accounts, or load the sample demo data to see amortization waterfalls and penalty calculations in action.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setIsAccountModalOpen(true)}
+              style={{ padding: '8px 16px' }}
+            >
+              <PlusCircle size={15} />
+              Create First Account
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={resetSample}
+              style={{ padding: '8px 16px' }}
+            >
+              <FileSpreadsheet size={15} color="var(--accent-emerald)" />
+              Load Sample Demo Data
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Collection Progress Bar */}
       <div className="glass-card" style={{ marginBottom: 16 }}>
@@ -325,7 +376,7 @@ export function DashboardPage() {
         fileName={`Land_Amortization_Tracker_${toISODateString(new Date())}.xlsx`}
         onDirectDownload={() => exportExcel(`Land_Amortization_Tracker_${toISODateString(new Date())}.xlsx`)}
         onShareNative={() => shareDrive()}
-        isCordova={!!(window.cordova && window.plugins && window.plugins.socialsharing)}
+        isCordova={Boolean(window.cordova || (window.plugins && window.plugins.socialsharing) || /android|iphone|ipad/i.test(navigator.userAgent))}
       />
     </div>
   );

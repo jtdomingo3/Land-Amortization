@@ -127,13 +127,15 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
             padding: '12px 14px',
             marginBottom: 16
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-emerald-light)', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: 6 }}>
               <Smartphone size={16} />
-              <span>Android Phone Integration</span>
+              <span>How to Save to Google Drive on Android:</span>
             </div>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              Tapping below opens your Android phone's Google Drive app. You can pick any Google account on your phone and choose a folder.
-            </div>
+            <ol style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.5, paddingLeft: 18, margin: 0 }}>
+              <li>Tap <strong>Upload to Google Drive</strong> below to open Android's Share menu.</li>
+              <li>Select <strong>Google Drive (Save to Drive)</strong> or <strong>Sheets</strong>.</li>
+              <li>Choose your account & folder, and tap <strong>Save</strong>.</li>
+            </ol>
           </div>
         ) : (
           <div style={{
@@ -162,7 +164,7 @@ export function GoogleDriveShareModal({ isOpen, onClose, fileName, onShareNative
               onClick={handleNativeShare}
             >
               <CloudUpload size={18} />
-              Open in Google Drive App
+              Upload to Google Drive (Save to Drive)
             </button>
           ) : (
             <>

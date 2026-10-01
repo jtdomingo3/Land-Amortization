@@ -165,28 +165,18 @@ export async function initDatabase() {
 function setupWebStorage() {
   isWebFallback = true;
   const accounts = getWebData(WEB_STORAGE_KEYS.ACCOUNTS, null);
-  if (!accounts || accounts.length === 0) {
-    setWebData(WEB_STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    setWebData(WEB_STORAGE_KEYS.PAYMENTS, INITIAL_PAYMENTS);
-    setWebData(WEB_STORAGE_KEYS.SETTINGS, { theme: 'dark', currency: 'PHP' });
+  if (accounts === null) {
+    setWebData(WEB_STORAGE_KEYS.ACCOUNTS, []);
+    setWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
+    setWebData(WEB_STORAGE_KEYS.SETTINGS, { theme: 'light', currency: 'PHP' });
     setWebData(WEB_STORAGE_KEYS.EXPORT_LOG, []);
-    console.log('Web Storage seeded with initial sample data.');
+    console.log('Web Storage initialized clean with 0 accounts.');
   }
 }
 
 async function checkAndSeedData() {
-  if (isWebFallback) return;
-  const accounts = await getAccounts();
-  if (!accounts || accounts.length === 0) {
-    console.log('Seeding SQLite with initial sample data...');
-    for (const acc of INITIAL_ACCOUNTS) {
-      await insertAccount(acc);
-    }
-    for (const p of INITIAL_PAYMENTS) {
-      await insertPayment(p);
-    }
-    console.log('SQLite seeded successfully.');
-  }
+  // Start with clean database; user can load sample demo data on demand
+  console.log('SQLite database ready for user accounts.');
 }
 
 /**

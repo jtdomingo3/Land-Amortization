@@ -12,11 +12,12 @@ import {
   Users,
   ChevronRight,
   Clock,
-  Calendar
+  Calendar,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export function AccountsPage() {
-  const { accounts, addAccount } = useApp();
+  const { accounts, addAccount, resetSample } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('id-asc');
@@ -144,18 +145,40 @@ export function AccountsPage() {
 
       {/* Account Cards List */}
       {filteredAccounts.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
-          <Users size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 10px auto' }} />
-          <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-            No accounts found
+        <div className="glass-card" style={{ textAlign: 'center', padding: '36px 18px', borderRadius: 14 }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            background: 'rgba(16, 185, 129, 0.1)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--accent-emerald)',
+            marginBottom: 12
+          }}>
+            <Users size={26} />
+          </div>
+          <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+            {accounts.length === 0 ? 'No Land Accounts Yet' : 'No matching accounts found'}
           </h4>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14 }}>
-            {searchQuery ? 'Try changing your search or filters' : 'Start by creating your first buyer account'}
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 320, margin: '0 auto 16px auto', lineHeight: 1.45 }}>
+            {accounts.length === 0
+              ? 'Start by creating your first buyer account, or load sample demo data to see how calculations and waterfall schedules work.'
+              : 'Try changing your search terms or filters.'}
           </p>
-          <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)}>
-            <Plus size={14} />
-            Create Account
-          </button>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)} style={{ padding: '8px 16px' }}>
+              <Plus size={15} />
+              {accounts.length === 0 ? 'Create First Account' : 'New Account'}
+            </button>
+            {accounts.length === 0 && (
+              <button className="btn btn-secondary btn-sm" onClick={resetSample} style={{ padding: '8px 16px' }}>
+                <FileSpreadsheet size={15} color="var(--accent-emerald)" />
+                Load Sample Demo Data
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="accounts-list">
@@ -184,18 +207,18 @@ export function AccountsPage() {
 
                 <div className="account-financials">
                   <div className="fin-col">
-                    <span className="label">Contract</span>
+                    <span className="label">Total Contract</span>
                     <span className="value">{formatCurrency(account.total_contract_amount)}</span>
                   </div>
                   <div className="fin-col">
-                    <span className="label">Paid</span>
+                    <span className="label">Total Paid</span>
                     <span className="value" style={{ color: 'var(--accent-emerald-light)' }}>
                       {formatCurrency(account.total_paid)}
                     </span>
                   </div>
-                  <div className="fin-col">
+                  <div className="fin-col full-width">
                     <span className="label">Balance Due</span>
-                    <span className="value" style={{ color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'inherit' }}>
+                    <span className="value" style={{ color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontSize: '0.88rem' }}>
                       {formatCurrency(account.outstanding_balance)}
                     </span>
                   </div>

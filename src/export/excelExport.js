@@ -319,52 +319,70 @@ export async function saveWithFolderPicker(accounts = [], payments = [], customF
 
 /**
  * Save workbook to device Downloads / Local storage
- * Returns { success, filePath, fileName, blob, blobUrl, saveLocation, message }
+ * Returns { success, filePath, fileName, blob, blobUrl, saveLocation, message, base64Data, dataUri }
  */
 export async function saveWorkbookToDevice(accounts = [], payments = [], customFileName = null) {
   const fileName = getExportFileName(customFileName);
   const wb = generateWorkbook(accounts, payments);
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const base64Data = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  const dataUri = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
   const blob = new Blob([wbout], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 
   // 1. Native Cordova Environment on device
-  if (window.cordova && window.resolveLocalFileSystemURL && window.cordova.file && blob) {
-    try {
-      // Prioritize the user's public Downloads directory so it is visible in file managers
-      const downloadPath = window.cordova.file.externalRootDirectory ? (window.cordova.file.externalRootDirectory + 'Download/') : null;
-      const storageDir = downloadPath ||
-                         window.cordova.file.externalDataDirectory ||
-                         window.cordova.file.dataDirectory ||
-                         window.cordova.file.cacheDirectory;
+  if (window.cordova) {
+    let savedFilePath = null;
+    if (window.resolveLocalFileSystemURL && window.cordova.file) {
+      try {
+        const storageDir = window.cordova.file.externalDataDirectory ||
+                           window.cordova.file.dataDirectory ||
+                           window.cordova.file.cacheDirectory;
 
-      const fileResult = await new Promise((resolve, reject) => {
-        window.resolveLocalFileSystemURL(storageDir, (dirEntry) => {
-          dirEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
-            fileEntry.createWriter((fileWriter) => {
-              fileWriter.onwriteend = () => {
-                resolve({
-                  success: true,
-                  filePath: fileEntry.nativeURL || fileEntry.toURL(),
-                  fileName: fileName,
-                  saveLocation: 'device_storage',
-                  message: `Saved to device storage: Download/${fileName}`,
-                  blob
-                });
-              };
-              fileWriter.onerror = (e) => reject(e);
-              fileWriter.write(blob);
+        if (storageDir) {
+          savedFilePath = await new Promise((resolve, reject) => {
+            window.resolveLocalFileSystemURL(storageDir, (dirEntry) => {
+              dirEntry.getFile(fileName, { create: true, exclusive: false }, (fileEntry) => {
+                fileEntry.createWriter((fileWriter) => {
+                  fileWriter.onwriteend = () => {
+                    resolve(fileEntry.nativeURL || fileEntry.toURL());
+                  };
+                  fileWriter.onerror = (e) => reject(e);
+                  fileWriter.write(blob);
+                }, reject);
+              }, reject);
             }, reject);
-          }, reject);
-        }, reject);
-      });
-
-      return fileResult;
-    } catch (cordovaErr) {
-      console.warn('Cordova storage write note:', cordovaErr);
+          });
+        }
+      } catch (err) {
+        console.warn('Cordova file system write fallback:', err);
+      }
     }
+
+    const fileTarget = savedFilePath || dataUri;
+
+    // Trigger system share chooser if on device so user can pick where to save
+    if (window.plugins && window.plugins.socialsharing) {
+      window.plugins.socialsharing.shareWithOptions({
+        message: 'Land Amortization Tracker Export',
+        subject: fileName,
+        files: [fileTarget],
+        chooserTitle: 'Save / Export .xlsx File'
+      });
+    }
+
+    return {
+      success: true,
+      filePath: fileTarget,
+      fileName,
+      saveLocation: 'device_storage',
+      message: `Saved as "${fileName}"! System menu opened to choose save location.`,
+      blob,
+      base64Data,
+      dataUri
+    };
   }
 
   // 2. Browser environment: trigger robust download
@@ -375,6 +393,8 @@ export async function saveWorkbookToDevice(accounts = [], payments = [], customF
     filePath: fileName,
     fileName: fileName,
     blob,
+    base64Data,
+    dataUri,
     ...browserRes
   };
 }

@@ -40,7 +40,7 @@ export function ExportSharePage() {
   const [lastExport, setLastExport] = useState(null);
 
   const handleShareToDrive = async () => {
-    if (window.cordova && window.plugins && window.plugins.socialsharing) {
+    if (window.cordova || (window.plugins && window.plugins.socialsharing)) {
       try {
         setLoadingAction('share');
         setSuccessMessage('');
@@ -402,7 +402,7 @@ export function ExportSharePage() {
         fileName={exportFileName}
         onDirectDownload={() => handleSaveToDevice()}
         onShareNative={() => shareDrive(exportFileName)}
-        isCordova={!!(window.cordova && window.plugins && window.plugins.socialsharing)}
+        isCordova={Boolean(window.cordova || (window.plugins && window.plugins.socialsharing) || /android|iphone|ipad/i.test(navigator.userAgent))}
       />
     </div>
   );

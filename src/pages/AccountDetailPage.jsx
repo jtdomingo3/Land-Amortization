@@ -122,16 +122,16 @@ export function AccountDetailPage({ accountId, onBack }) {
         {/* Financial Highlights */}
         <div className="account-financials">
           <div className="fin-col">
-            <span className="label">Contract</span>
+            <span className="label">Total Contract</span>
             <span className="value">{formatCurrency(account.total_contract_amount)}</span>
           </div>
           <div className="fin-col">
             <span className="label">Base Balance</span>
             <span className="value">{formatCurrency(account.base_balance)}</span>
           </div>
-          <div className="fin-col">
-            <span className="label">Outstanding Due</span>
-            <span className="value" style={{ color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+          <div className="fin-col full-width">
+            <span className="label">Outstanding Due (Incl. Penalties)</span>
+            <span className="value" style={{ color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontSize: '0.96rem' }}>
               {formatCurrency(account.outstanding_balance)}
             </span>
           </div>

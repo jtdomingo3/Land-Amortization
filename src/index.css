@@ -43,7 +43,7 @@
   --radius-full: 9999px;
 
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Plus Jakarta Sans', sans-serif;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -227,7 +227,7 @@ body {
 /* Main Content Area */
 .app-content {
   flex: 1;
-  padding: 16px 16px calc(var(--safe-bottom) + 80px) 16px;
+  padding: 16px 16px calc(var(--safe-bottom) + 110px) 16px;
   overflow-y: auto;
 }
 
@@ -748,27 +748,51 @@ body {
 
 .account-financials {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 10px 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  background: var(--bg-card-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
   margin: 10px 0;
+}
+
+.account-financials .fin-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.account-financials .fin-col.full-width {
+  grid-column: 1 / -1;
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
 }
 
 .fin-col .label {
   font-size: 0.68rem;
   color: var(--text-secondary);
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .fin-col .value {
   font-family: var(--font-mono);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 /* Schedule Table */
