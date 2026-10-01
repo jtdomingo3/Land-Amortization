@@ -83,6 +83,25 @@ gdrive_*.png
 .env.*
 *.env
 
-# Electron build outputs
+# Electron & Windows Installer Outputs
 dist-electron/
+**/dist-electron/
+release/
+**/release/
+win-unpacked/
+**/win-unpacked/
+*.exe
+*.msi
+*.blockmap
+builder-effective-config.yaml
+builder-debug.yml
+
+# SQLite Databases & Local Storage
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 
