@@ -18,9 +18,12 @@ import {
   saveGoogleDriveConfig,
   disconnectGoogleDrive,
   openGoogleDriveFolder,
-  uploadToGoogleDrive
+  uploadToGoogleDrive,
+  extractFolderId,
+  generateAppsScriptCode
 } from '../services/googleDriveService.js';
 import { shareToGoogleDrive } from '../share/shareFile.js';
+import { Copy, Check, Terminal, Play, Sparkles } from 'lucide-react';
 
 export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = [], fileName = '' }) {
   const [config, setConfig] = useState(getGoogleDriveConfig());
@@ -75,6 +78,16 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
     openGoogleDriveFolder(folderUrl);
   };
 
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  const handleCopyScript = () => {
+    const targetFolderId = extractFolderId(folderUrl) || '1YarYj_0Cjr7dgYp9MU2YYXivjnbdbv1m';
+    const code = generateAppsScriptCode(targetFolderId);
+    navigator.clipboard.writeText(code);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 3000);
+  };
+
   const handleSaveToDrive = async () => {
     setIsProcessing(true);
     setErrorMsg('');
@@ -102,6 +115,9 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
 
       // 2. Standard Mobile/Web Google Drive Launch
       const res = await shareToGoogleDrive(accounts, payments, fileName);
+      if (res.method === 'browser_drive_link') {
+        res.message = `Workbook "${res.fileName}" downloaded to your computer and Google Drive Backup folder opened. Drag the downloaded file into Google Drive to complete, or use the 1-minute Automated Webhook below to upload directly with zero manual steps!`;
+      }
       setActionResult(res);
       setStatusMessage('');
     } catch (err) {
@@ -172,6 +188,25 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           </div>
         </div>
 
+        {/* Note on Google Drive Folder Permission */}
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.12)',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          borderRadius: 8,
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f59e0b', fontWeight: 700, fontSize: '0.85rem' }}>
+            <AlertTriangle size={18} />
+            <span>Folder Setup: Set "Anyone with the link"</span>
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            To ensure your backup folder accepts saves and is accessible, open your Google Drive folder, click <strong>Share</strong>, and set General Access to <strong>"Anyone with the link"</strong> (Editor or Viewer).
+          </div>
+        </div>
+
         {/* Feedback messages */}
         {errorMsg && (
           <div style={{
@@ -235,33 +270,51 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           </div>
         )}
 
-        {/* Option: Google Drive Shared Folder Link */}
+        {/* Google Drive Shared Folder Link */}
         <div className="form-group">
-          <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <label className="form-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Link size={14} color="var(--accent-cyan)" />
-              Google Drive Folder Link (Optional)
-            </span>
-            {folderUrl && (
+              Google Drive Folder Link
+            </label>
+            <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
-                onClick={handleOpenFolderLink}
+                onClick={() => setFolderUrl('https://drive.google.com/drive/folders/1YarYj_0Cjr7dgYp9MU2YYXivjnbdbv1m?usp=drive_link')}
                 style={{
-                  background: 'none',
-                  border: 'none',
+                  background: 'rgba(6, 182, 212, 0.12)',
+                  border: '1px solid rgba(6, 182, 212, 0.3)',
                   color: 'var(--accent-cyan)',
-                  fontSize: '0.72rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
+                  fontSize: '0.7rem',
+                  padding: '2px 8px',
+                  borderRadius: 4,
                   cursor: 'pointer'
                 }}
+                title="Fill with provided test folder link"
               >
-                <ExternalLink size={12} />
-                Open Folder
+                Insert Test Link
               </button>
-            )}
-          </label>
+              {folderUrl && (
+                <button
+                  type="button"
+                  onClick={handleOpenFolderLink}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent-emerald)',
+                    fontSize: '0.72rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ExternalLink size={12} />
+                  Open Folder
+                </button>
+              )}
+            </div>
+          </div>
           <input
             type="url"
             className="form-input"
@@ -270,7 +323,7 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
             onChange={e => setFolderUrl(e.target.value)}
           />
           <span className="form-helper">
-            Paste your shared Google Drive folder link. You can open it anytime with 1 tap to view or manage your backups.
+            Paste your shared Google Drive folder link. Tapping <strong>Open Folder</strong> verifies your link directly in Google Drive.
           </span>
         </div>
 
@@ -292,53 +345,88 @@ export function GoogleDriveModal({ isOpen, onClose, accounts = [], payments = []
           </span>
         </div>
 
-        {/* Collapsible Advanced Section for Headless Webhook */}
-        <details style={{
-          background: 'var(--bg-card-subtle)',
-          border: '1px solid var(--border-color)',
+        {/* 100% Automated Background Upload Card */}
+        <div style={{
+          background: 'rgba(99, 102, 241, 0.08)',
+          border: '1px solid rgba(99, 102, 241, 0.28)',
           borderRadius: 8,
-          padding: '8px 12px',
-          marginTop: 4
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10
         }}>
-          <summary style={{
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            fontWeight: 600,
-            userSelect: 'none'
-          }}>
-            Advanced: Headless Webhook Upload (Optional)
-          </summary>
-          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.74rem' }}>
-                Google Apps Script Webhook URL
-              </label>
-              <input
-                type="url"
-                className="form-input mono"
-                placeholder="https://script.google.com/macros/s/.../exec"
-                value={webhookUrl}
-                onChange={e => setWebhookUrl(e.target.value)}
-                style={{ fontSize: '0.75rem' }}
-              />
-              <span className="form-helper" style={{ fontSize: '0.68rem' }}>
-                If provided, uploads will be delivered automatically in the background via this webhook.
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#818cf8', fontWeight: 700, fontSize: '0.86rem' }}>
+              <Sparkles size={18} />
+              <span>100% Automated Background Upload (Zero Clicks)</span>
             </div>
-            {config.webhookUrl && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handleClearSettings}
-                style={{ fontSize: '0.7rem', color: '#fb7185', alignSelf: 'flex-start' }}
-              >
-                <LogOut size={12} style={{ marginRight: 4 }} />
-                Clear Webhook
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleCopyScript}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: '0.72rem',
+                padding: '4px 10px',
+                background: copiedScript ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.15)',
+                color: copiedScript ? 'var(--accent-emerald)' : '#a5b4fc',
+                borderColor: copiedScript ? 'var(--accent-emerald)' : 'rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              {copiedScript ? <Check size={13} /> : <Copy size={13} />}
+              {copiedScript ? 'Script Copied!' : 'Copy Automated Upload Script'}
+            </button>
           </div>
-        </details>
+
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            To save directly into your Google Drive <strong>Backup</strong> folder with 0 manual steps:
+            <ol style={{ margin: '6px 0 0 18px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <li>Open Google Drive &rarr; Click <strong>+ New &gt; More &gt; Google Apps Script</strong></li>
+              <li>Click <strong>Copy Automated Upload Script</strong> above and paste into the editor</li>
+              <li>Click <strong>Deploy &gt; New deployment &gt; Web app</strong></li>
+              <li>Set <em>"Execute as"</em>: <strong>Me</strong> and <em>"Who has access"</em>: <strong>Anyone</strong> &rarr; Click <strong>Deploy</strong></li>
+              <li>Copy the Web App URL and paste below, then click <strong>Save Settings</strong>.</li>
+            </ol>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.74rem' }}>
+              Google Apps Script Web App URL
+            </label>
+            <input
+              type="url"
+              className="form-input mono"
+              placeholder="https://script.google.com/macros/s/.../exec"
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+              style={{ fontSize: '0.75rem' }}
+            />
+          </div>
+
+          {config.webhookUrl && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleClearSettings}
+              style={{ fontSize: '0.7rem', color: '#fb7185', alignSelf: 'flex-start' }}
+            >
+              <LogOut size={12} style={{ marginRight: 4 }} />
+              Disconnect Automated Webhook
+            </button>
+          )}
+        </div>
+        {/* Author Credit */}
+        <div style={{
+          textAlign: 'center',
+          fontSize: '0.72rem',
+          color: 'var(--text-muted)',
+          paddingTop: 4,
+          borderTop: '1px solid var(--border-color)'
+        }}>
+          Land Amortization Tracker • Developed by <strong>Gezyne-Jamir Software Tech</strong>
+        </div>
       </div>
     </Modal>
   );

@@ -46,19 +46,10 @@ export function ExportSharePage() {
   const [lastExport, setLastExport] = useState(null);
   const gdriveConfig = getGoogleDriveConfig();
 
-  const handleSaveToDriveDirect = async () => {
-    try {
-      setLoadingAction('drive');
-      setSuccessMessage('');
-      setErrorMessage('');
-      const res = await shareDrive(exportFileName);
-      setLastExport(res);
-      setSuccessMessage(res.message || 'Google Drive opened! Choose your Google account and target folder.');
-    } catch (err) {
-      setErrorMessage(err.message || 'Failed to open Google Drive');
-    } finally {
-      setLoadingAction(null);
-    }
+  const handleSaveToDriveDirect = () => {
+    // Open the Google Drive setup modal so the user can easily review the folder link,
+    // ensure "Anyone with the link" is enabled, and tap "Save to Google Drive Now"
+    setIsDriveModalOpen(true);
   };
 
   const handleNativeShare = async () => {
@@ -282,7 +273,7 @@ export function ExportSharePage() {
               }}
             >
               <Folder size={12} />
-              <span>Google Drive Settings & Folder Link</span>
+              <span>{gdriveConfig.folderUrl ? 'Folder Link Configured • Settings' : 'Setup Backup Folder Link'}</span>
             </button>
             {gdriveConfig.folderUrl && (
               <button
@@ -472,6 +463,17 @@ export function ExportSharePage() {
             Clear All Data
           </button>
         </div>
+      </div>
+
+      {/* Author & Developer Info */}
+      <div style={{
+        textAlign: 'center',
+        marginTop: 20,
+        marginBottom: 10,
+        fontSize: '0.74rem',
+        color: 'var(--text-muted)'
+      }}>
+        Land Amortization Tracker • Developed by <strong style={{ color: 'var(--text-secondary)' }}>Gezyne-Jamir Software Tech</strong>
       </div>
 
       {/* Google Drive Account Sync Modal */}

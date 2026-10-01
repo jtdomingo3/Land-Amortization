@@ -76,7 +76,7 @@ export function WelcomeModal({ isOpenManual, onCloseManual }) {
           <div style={{ display: 'flex', gap: 10, background: 'var(--bg-card-subtle)', padding: '10px 12px', borderRadius: 8 }}>
             <ShieldCheck size={18} color="var(--accent-emerald)" style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>100% Offline SQLite Storage</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>100% Offline Storage</div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 All accounts, payments, and schedules are stored securely on your device. No internet required.
               </div>
@@ -113,7 +113,8 @@ export function WelcomeModal({ isOpenManual, onCloseManual }) {
           fontSize: '0.82rem',
           color: 'var(--text-secondary)',
           cursor: 'pointer',
-          userSelect: 'none'
+          userSelect: 'none',
+          marginBottom: 10
         }}>
           <input
             type="checkbox"
@@ -123,6 +124,10 @@ export function WelcomeModal({ isOpenManual, onCloseManual }) {
           />
           <span>Don't show this welcome message again</span>
         </label>
+
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Developed by <strong>Gezyne-Jamir Software Tech</strong>
+        </div>
       </div>
     </Modal>
   );

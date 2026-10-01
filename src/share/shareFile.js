@@ -20,9 +20,9 @@ export async function shareToGoogleDrive(accounts, payments, customFileName = nu
     // 1. Cordova Android native: Launch Google Drive directly
     if (window.plugins && window.plugins.socialsharing) {
       return new Promise((resolve) => {
-        // Try launching Google Drive ("Save to Drive") directly
+        // Try targeting Google Drive's UploadMenuActivity directly
         window.plugins.socialsharing.shareVia(
-          'com.google.android.apps.docs',
+          'com.google.android.apps.docs/com.google.android.apps.docs.common.shareitem.UploadMenuActivity',
           'Land Amortization Tracker Backup',
           fileName,
           [shareTarget],
@@ -32,7 +32,7 @@ export async function shareToGoogleDrive(accounts, payments, customFileName = nu
             resolve({
               success: true,
               method: 'google_drive_direct',
-              message: `Google Drive opened! Choose your Google account and target folder to save "${fileName}".`,
+              message: `Google Drive opened! Confirm your Google account and target folder to save "${fileName}".`,
               fileName,
               filePath,
               displayPath,
@@ -40,31 +40,35 @@ export async function shareToGoogleDrive(accounts, payments, customFileName = nu
             });
           },
           (err) => {
-            console.warn('Google Drive direct share notice, falling back to share chooser:', err);
-            // Fallback if Google Drive app is missing or direct package intent throws
-            window.plugins.socialsharing.shareWithOptions(
-              {
-                message: 'Land Amortization Tracker Backup (.xlsx)',
-                subject: fileName,
-                files: [shareTarget],
-                chooserTitle: 'Save to Google Drive'
-              },
-              () => {
+            console.warn('Google Drive direct launch with activity notice, trying package only:', err);
+            // Fallback to package-only intent (launches Drive's default send receiver)
+            window.plugins.socialsharing.shareVia(
+              'com.google.android.apps.docs',
+              'Land Amortization Tracker Backup',
+              fileName,
+              [shareTarget],
+              null,
+              (res2) => {
                 resolve({
                   success: true,
-                  method: 'share_options',
-                  message: `Select Google Drive in the menu to upload "${fileName}".`,
+                  method: 'google_drive_direct',
+                  message: `Google Drive opened! Confirm your Google account and target folder to save "${fileName}".`,
                   fileName,
                   filePath,
                   displayPath,
                   blobUrl
                 });
               },
-              () => {
+              (err2) => {
+                console.error('Google Drive launch failed:', err2);
+                // Open the Google Drive backup folder link directly if configured
+                if (config && config.folderUrl) {
+                  openGoogleDriveFolder();
+                }
                 resolve({
-                  success: true,
-                  method: 'cancelled',
-                  message: `File saved locally to ${displayPath || fileName}.`,
+                  success: false,
+                  method: 'drive_app_not_found',
+                  message: `Could not launch Google Drive app directly. Please ensure Google Drive is installed, or upload "${fileName}" from Documents/Amortization Tracker/.`,
                   fileName,
                   filePath,
                   displayPath,

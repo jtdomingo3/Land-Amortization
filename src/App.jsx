@@ -27,7 +27,7 @@ export function App() {
         gap: 12
       }}>
         <Loader2 className="animate-spin" size={36} color="var(--accent-emerald)" style={{ animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Loading SQLite Database...</div>
+        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Loading Land Amortization...</div>
         <style>{`
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         `}</style>

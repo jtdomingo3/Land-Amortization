@@ -16,6 +16,15 @@ import { toISODateString } from '../utils/formatters.js';
 export function generateWorkbook(accounts = [], payments = [], todayRef = new Date()) {
   const wb = XLSX.utils.book_new();
 
+  // Set Workbook Metadata & Author
+  wb.Props = {
+    Title: 'Land Amortization Tracker',
+    Subject: 'Land Amortization Accounts & Schedules',
+    Author: 'Gezyne-Jamir Software Tech',
+    Company: 'Gezyne-Jamir Software Tech',
+    CreatedDate: new Date()
+  };
+
   // 1. Precompute all account derived values
   const accountsDerived = accounts.map(a => computeAccountDerived(a, payments, todayRef));
   const paymentsDerived = payments.map(p => {
@@ -182,6 +191,8 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
   // ============================================
   const instructionsRows = [
     ['HOW TO USE THE LAND AMORTIZATION TRACKER'],
+    ['AUTHOR / DEVELOPER: Gezyne-Jamir Software Tech'],
+    [''],
     ...INSTRUCTIONS.map(i => [i])
   ];
 

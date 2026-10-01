@@ -147,28 +147,35 @@ export async function uploadToGoogleDrive(accounts = [], payments = [], customFi
   // Flow A: Google Apps Script Webhook
   if (config.webhookUrl) {
     if (onProgress) onProgress('Uploading to Google Drive via Webhook...');
+    const folderId = config.folderId || extractFolderId(config.folderUrl) || '';
     const payload = {
       fileName,
-      folderName: config.folderName || 'Land Amortization Backups',
+      folderId,
+      folderName: config.folderName || 'Backup',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       base64: base64Data
     };
 
     const res = await fetch(config.webhookUrl, {
       method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     });
 
     const data = await res.json().catch(() => ({}));
+    if (data.status === 'error') {
+      throw new Error(data.message || 'Webhook upload failed in Google Drive.');
+    }
+
     saveGoogleDriveConfig({ lastSync: new Date().toISOString() });
 
     return {
       success: true,
       fileName,
-      folderName: config.folderName,
+      folderName: config.folderName || 'Backup',
       fileId: data.fileId || null,
-      webViewLink: data.url || `https://drive.google.com/drive/search?q=${encodeURIComponent(fileName)}`,
-      message: `Successfully uploaded "${fileName}" to Google Drive folder "${config.folderName}"!`
+      webViewLink: data.url || (folderId ? `https://drive.google.com/drive/folders/${folderId}` : `https://drive.google.com/drive/search?q=${encodeURIComponent(fileName)}`),
+      message: `Successfully uploaded "${fileName}" directly to your Google Drive folder!`
     };
   }
 
@@ -240,3 +247,40 @@ export async function uploadToGoogleDrive(accounts = [], payments = [], customFi
   err.code = 'NOT_CONFIGURED';
   throw err;
 }
+
+/**
+ * Generates ready-to-paste Google Apps Script code for zero-config automated Drive uploads
+ */
+export function generateAppsScriptCode(targetFolderId = '1YarYj_0Cjr7dgYp9MU2YYXivjnbdbv1m') {
+  return `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var targetFolderId = data.folderId || "${targetFolderId}";
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(targetFolderId);
+    } catch (fErr) {
+      folder = DriveApp.getRootFolder();
+    }
+    var decoded = Utilities.base64Decode(data.base64);
+    var blob = Utilities.newBlob(
+      decoded,
+      data.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      data.fileName
+    );
+    var file = folder.createFile(blob);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      fileId: file.getId(),
+      fileName: file.getName(),
+      url: file.getUrl()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+}
+

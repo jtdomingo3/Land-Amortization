@@ -16,12 +16,7 @@ export function Header() {
         />
         <div className="brand-text">
           <h1>Land Amortization</h1>
-          <div className="status-row">
-            <span className="offline-pill">
-              <span className="offline-dot"></span>
-              {isCordova ? 'Offline SQLite' : 'Offline Storage'}
-            </span>
-          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Tracker</span>
         </div>
       </div>
 

@@ -40,7 +40,7 @@ export function HelpPage() {
             <WifiOff size={18} color="var(--accent-emerald)" style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
               <strong style={{ color: 'var(--text-primary)' }}>100% Offline Database: </strong>
-              All land accounts, payment records, and amortization waterfall schedules are stored locally in an embedded SQLite database on your device. You can record payments and manage accounts anywhere without internet.
+              All land accounts, payment records, and amortization waterfall schedules are stored locally on your device. You can record payments and manage accounts anywhere without internet.
             </div>
           </div>
 
@@ -113,6 +113,19 @@ export function HelpPage() {
         >
           Reset & Show Welcome Popup on Startup
         </button>
+      </div>
+
+      {/* About & Developer Credits */}
+      <div className="glass-card" style={{ marginTop: 16 }}>
+        <h3 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: 8, color: 'var(--accent-cyan)', textTransform: 'uppercase' }}>
+          About & Author
+        </h3>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+          Land Amortization Tracker is built for fast, accurate offline land amortization management, waterfall schedule calculation, and seamless cloud backups.
+        </p>
+        <div style={{ marginTop: 8, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          Author & Developer: <strong style={{ color: 'var(--text-primary)' }}>Gezyne-Jamir Software Tech</strong>
+        </div>
       </div>
     </div>
   );

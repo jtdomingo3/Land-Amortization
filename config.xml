@@ -2,8 +2,8 @@
 <widget id="com.landamortization.tracker" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>Land Amortization Tracker</name>
     <description>Offline Land Amortization Tracker with SQLite and Google Drive export</description>
-    <author email="support@landamortization.local" href="https://landamortization.local">
-        Land Amortization Team
+    <author email="support@gezynejamir.com" href="https://gezynejamir.com">
+        Gezyne-Jamir Software Tech
     </author>
     <content src="index.html" />
     <access origin="*" />
