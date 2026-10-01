@@ -7,7 +7,18 @@ import { createRequire } from 'module';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
+let Database;
+try {
+  Database = require('better-sqlite3');
+} catch (err) {
+  const unpackedPath = path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'better-sqlite3');
+  if (fs.existsSync(unpackedPath)) {
+    Database = require(unpackedPath);
+  } else {
+    console.error('Failed to load better-sqlite3:', err);
+    throw err;
+  }
+}
 
 let mainWindow = null;
 let db = null;
@@ -432,11 +443,17 @@ function setupIpcHandlers() {
 }
 
 function createWindow() {
+  const icoDev = path.join(__dirname, '../public/icon.ico');
+  const icoProd = path.join(app.getAppPath(), 'dist/icon.ico');
   const devIconPath = path.join(__dirname, '../public/logo.png');
   const prodIconPath = path.join(app.getAppPath(), 'dist/logo.png');
   const fallbackIcon = path.join(__dirname, '../src/assets/logo.png');
   let appIcon = devIconPath;
-  if (fs.existsSync(devIconPath)) {
+  if (fs.existsSync(icoDev)) {
+    appIcon = icoDev;
+  } else if (fs.existsSync(icoProd)) {
+    appIcon = icoProd;
+  } else if (fs.existsSync(devIconPath)) {
     appIcon = devIconPath;
   } else if (fs.existsSync(prodIconPath)) {
     appIcon = prodIconPath;
