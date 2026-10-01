@@ -75,11 +75,11 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   };
 
   const handleLoadSample = async () => {
-    if (confirm('Load sample company details (Angeles Land Development Inc.)? Any unsaved edits will be replaced.')) {
+    if (confirm('Load default company details (CORTEZ LAND AMORTIZATION COLLECTION TRACKER)? Any unsaved edits will be replaced.')) {
       try {
         const sample = await loadSampleCompany(true);
         setForm(sample);
-        setSaveStatus({ type: 'success', message: 'Sample company data loaded successfully!' });
+        setSaveStatus({ type: 'success', message: 'Default company data loaded successfully!' });
         setTimeout(() => setSaveStatus(null), 4000);
       } catch (err) {
         setSaveStatus({ type: 'error', message: 'Failed to load sample: ' + err.message });
@@ -183,11 +183,11 @@ export function SettingsPage({ defaultOpenHelp = false }) {
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={handleLoadSample}
-          title="Populate with sample Angeles Land Development details"
+          title="Reset to default Cortez Land details"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <Sparkles size={14} color="var(--accent-cyan)" />
-          <span>Load Sample</span>
+          <span>Load Default</span>
         </button>
       </div>
 
@@ -233,7 +233,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
               className="form-input"
               value={form.company_name}
               onChange={e => handleChange('company_name', e.target.value)}
-              placeholder="e.g. Angeles Land Development Inc."
+              placeholder="e.g. CORTEZ LAND AMORTIZATION COLLECTION TRACKER"
               required
             />
           </div>
@@ -245,7 +245,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
               className="form-input"
               value={form.company_address}
               onChange={e => handleChange('company_address', e.target.value)}
-              placeholder="e.g. Sta Elena, Camarines Norte"
+              placeholder="e.g. Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte"
             />
           </div>
 
@@ -257,7 +257,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.company_contact}
                 onChange={e => handleChange('company_contact', e.target.value)}
-                placeholder="e.g. (043) 555-1234"
+                placeholder="e.g. 0935-3551416"
               />
             </div>
 
@@ -268,7 +268,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.company_email}
                 onChange={e => handleChange('company_email', e.target.value)}
-                placeholder="e.g. info@angelesland.ph"
+                placeholder="e.g. artjrbarbasa@yahoo.com"
               />
             </div>
           </div>
@@ -381,7 +381,7 @@ export function SettingsPage({ defaultOpenHelp = false }) {
                 className="form-input"
                 value={form.signatory_name}
                 onChange={e => handleChange('signatory_name', e.target.value)}
-                placeholder="e.g. Engr. Roberto Angeles"
+                placeholder="e.g. ARTEMIO TEDOCO-BARBASA"
               />
             </div>
 

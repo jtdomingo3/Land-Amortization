@@ -29,6 +29,7 @@ export function getSampleData() {
       land_area_sqm: 500,
       total_contract_amount: 1500000,
       down_payment: 50000,
+      is_dp_paid: 1,
       agreed_dp_due: addMonthsEdate(todayStr, -12),
       monthly_amortization: 12083.33,
       num_of_months: 180,
@@ -43,6 +44,7 @@ export function getSampleData() {
       land_area_sqm: 100,
       total_contract_amount: 300000,
       down_payment: 20000,
+      is_dp_paid: 1,
       agreed_dp_due: addMonthsEdate(todayStr, -4),
       monthly_amortization: 2333.33,
       num_of_months: 120,
@@ -56,11 +58,12 @@ export function getSampleData() {
       land_title_number: "TCT-99999",
       land_area_sqm: 250,
       total_contract_amount: 500000,
-      down_payment: 0,
+      down_payment: 20000,
+      is_dp_paid: 0,
       agreed_dp_due: addMonthsEdate(todayStr, -1),
       monthly_amortization: 4166.67,
       num_of_months: 120,
-      remarks: "Sample buyer 3 - Down Payment Overdue (1% Contract Amount Penalty)"
+      remarks: "Sample buyer 3 - Down Payment Overdue (1% Contract Amount Penalty, DP ₱20,000 Unpaid)"
     }
   ];
 
@@ -160,6 +163,7 @@ export async function initDatabase() {
           tx.executeSql(CREATE_INDEX_PAYMENTS);
           tx.executeSql(CREATE_TABLE_SETTINGS);
           tx.executeSql(CREATE_TABLE_EXPORT_LOG);
+          tx.executeSql('ALTER TABLE land_accounts ADD COLUMN is_dp_paid INTEGER DEFAULT 0;', [], () => {}, () => false);
         }, (err) => {
           console.error('Database migration error:', err);
           reject(err);
@@ -258,7 +262,8 @@ export async function insertAccount(acc) {
     agreed_dp_due: acc.agreed_dp_due || '',
     monthly_amortization: Number(acc.monthly_amortization) || 0,
     num_of_months: Number(acc.num_of_months) || 120,
-    remarks: acc.remarks || ''
+    remarks: acc.remarks || '',
+    is_dp_paid: acc.is_dp_paid ? 1 : 0
   };
 
   if (isWebFallback) {
@@ -276,14 +281,14 @@ export async function insertAccount(acc) {
     INSERT INTO land_accounts (
       account_id, name, date_of_start, first_due_date, land_title_number,
       land_area_sqm, total_contract_amount, down_payment, agreed_dp_due,
-      monthly_amortization, num_of_months, remarks
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      monthly_amortization, num_of_months, remarks, is_dp_paid
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   await runSql(sql, [
     account.account_id, account.name, account.date_of_start, account.first_due_date,
     account.land_title_number, account.land_area_sqm, account.total_contract_amount,
     account.down_payment, account.agreed_dp_due, account.monthly_amortization,
-    account.num_of_months, account.remarks
+    account.num_of_months, account.remarks, account.is_dp_paid
   ]);
   return account;
 }
@@ -301,7 +306,8 @@ export async function updateAccount(acc) {
     agreed_dp_due: acc.agreed_dp_due || '',
     monthly_amortization: Number(acc.monthly_amortization) || 0,
     num_of_months: Number(acc.num_of_months) || 120,
-    remarks: acc.remarks || ''
+    remarks: acc.remarks || '',
+    is_dp_paid: acc.is_dp_paid ? 1 : 0
   };
 
   if (isWebFallback) {
@@ -317,14 +323,14 @@ export async function updateAccount(acc) {
     UPDATE land_accounts SET
       name = ?, date_of_start = ?, first_due_date = ?, land_title_number = ?,
       land_area_sqm = ?, total_contract_amount = ?, down_payment = ?, agreed_dp_due = ?,
-      monthly_amortization = ?, num_of_months = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP
+      monthly_amortization = ?, num_of_months = ?, remarks = ?, is_dp_paid = ?, updated_at = CURRENT_TIMESTAMP
     WHERE account_id = ?
   `;
   await runSql(sql, [
     account.name, account.date_of_start, account.first_due_date, account.land_title_number,
     account.land_area_sqm, account.total_contract_amount, account.down_payment,
     account.agreed_dp_due, account.monthly_amortization, account.num_of_months,
-    account.remarks, account.account_id
+    account.remarks, account.is_dp_paid, account.account_id
   ]);
   return account;
 }

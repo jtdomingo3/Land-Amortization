@@ -16,7 +16,8 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
     agreed_dp_due: toISODateString(new Date()),
     monthly_amortization: '',
     num_of_months: '120',
-    remarks: ''
+    remarks: '',
+    is_dp_paid: false
   });
 
   const [error, setError] = useState('');
@@ -36,7 +37,8 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
         agreed_dp_due: editAccount.agreed_dp_due || '',
         monthly_amortization: editAccount.monthly_amortization || '',
         num_of_months: editAccount.num_of_months || 120,
-        remarks: editAccount.remarks || ''
+        remarks: editAccount.remarks || '',
+        is_dp_paid: Boolean(editAccount.is_dp_paid)
       });
     } else {
       // Suggest next Account ID
@@ -55,22 +57,37 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
         agreed_dp_due: toISODateString(new Date()),
         monthly_amortization: '',
         num_of_months: '120',
-        remarks: ''
+        remarks: '',
+        is_dp_paid: false
       });
     }
     setError('');
   }, [editAccount, existingAccounts, isOpen]);
 
-  // Auto-calculate suggested monthly amortization when contract amount or months change
-  const handleContractOrMonthsChange = (field, val) => {
-    const updated = { ...formData, [field]: val };
-    const contract = Number(field === 'total_contract_amount' ? val : updated.total_contract_amount) || 0;
-    const dp = Number(field === 'down_payment' ? val : updated.down_payment) || 0;
-    const months = Number(field === 'num_of_months' ? val : updated.num_of_months) || 120;
+  // Calculate monthly amortization based on contract, down payment, months, and DP status
+  const calculateAmortization = (contractVal, dpVal, monthsVal, isDpPaidVal) => {
+    const contract = Number(contractVal) || 0;
+    const dp = Number(dpVal) || 0;
+    const months = Number(monthsVal) || 120;
+    if (contract <= 0 || months <= 0) return '';
+    // If DP is paid: amortize contract minus DP
+    // If DP is NOT paid: amortize full contract
+    const balance = isDpPaidVal ? Math.max(0, contract - dp) : contract;
+    return (balance / months).toFixed(2);
+  };
 
-    if (contract > 0 && months > 0 && (!updated.monthly_amortization || field === 'total_contract_amount' || field === 'down_payment' || field === 'num_of_months')) {
-      const balance = Math.max(0, contract - dp);
-      updated.monthly_amortization = (balance / months).toFixed(2);
+  const handleFieldChange = (field, val) => {
+    const updated = { ...formData, [field]: val };
+    const contract = field === 'total_contract_amount' ? val : updated.total_contract_amount;
+    const dp = field === 'down_payment' ? val : updated.down_payment;
+    const months = field === 'num_of_months' ? val : updated.num_of_months;
+    const isPaid = field === 'is_dp_paid' ? val : updated.is_dp_paid;
+
+    if (field === 'total_contract_amount' || field === 'down_payment' || field === 'num_of_months' || field === 'is_dp_paid') {
+      const calc = calculateAmortization(contract, dp, months, isPaid);
+      if (calc) {
+        updated.monthly_amortization = calc;
+      }
     }
     setFormData(updated);
   };
@@ -112,7 +129,8 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
       total_contract_amount: Number(formData.total_contract_amount) || 0,
       down_payment: Number(formData.down_payment) || 0,
       monthly_amortization: Number(formData.monthly_amortization) || 0,
-      land_area_sqm: Number(formData.land_area_sqm) || 0
+      land_area_sqm: Number(formData.land_area_sqm) || 0,
+      is_dp_paid: formData.is_dp_paid ? 1 : 0
     });
     onClose();
   };
@@ -229,7 +247,7 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
               className="form-input mono"
               placeholder="1500000"
               value={formData.total_contract_amount}
-              onChange={e => handleContractOrMonthsChange('total_contract_amount', e.target.value)}
+              onChange={e => handleFieldChange('total_contract_amount', e.target.value)}
               required
             />
           </div>
@@ -242,10 +260,84 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
               className="form-input mono"
               placeholder="50000"
               value={formData.down_payment}
-              onChange={e => handleContractOrMonthsChange('down_payment', e.target.value)}
+              onChange={e => handleFieldChange('down_payment', e.target.value)}
             />
           </div>
         </div>
+
+        {/* Down Payment Status Selection (Paid vs Not Paid) */}
+        {Number(formData.down_payment) > 0 && (
+          <div style={{
+            background: 'var(--bg-card-subtle)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 8,
+            padding: '10px 12px',
+            marginBottom: 14,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Down Payment Status
+              </label>
+              <div style={{
+                display: 'inline-flex',
+                background: 'var(--bg-surface)',
+                padding: 2,
+                borderRadius: 8,
+                border: '1px solid var(--border-subtle)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange('is_dp_paid', true)}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: formData.is_dp_paid ? 'var(--accent-emerald)' : 'transparent',
+                    color: formData.is_dp_paid ? '#000' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  ✓ Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange('is_dp_paid', false)}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: !formData.is_dp_paid ? 'var(--accent-amber)' : 'transparent',
+                    color: !formData.is_dp_paid ? '#000' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  ✕ Not Paid
+                </button>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.72rem', color: formData.is_dp_paid ? 'var(--accent-emerald-light)' : 'var(--text-muted)', lineHeight: 1.4 }}>
+              {formData.is_dp_paid ? (
+                <span>
+                  ✓ <strong>Paid Upfront:</strong> Monthly amortization recomputed on balance (₱{Math.max(0, Number(formData.total_contract_amount || 0) - Number(formData.down_payment || 0)).toLocaleString()}) ÷ {formData.num_of_months || 120} mos = <strong>₱{formData.monthly_amortization || '0.00'}</strong>
+                </span>
+              ) : (
+                <span>
+                  ⏳ <strong>Not Paid:</strong> Monthly amortization computed on full contract (₱{Number(formData.total_contract_amount || 0).toLocaleString()}) ÷ {formData.num_of_months || 120} mos = <strong>₱{formData.monthly_amortization || '0.00'}</strong>. (Will reduce to ₱{((Math.max(0, Number(formData.total_contract_amount || 0) - Number(formData.down_payment || 0))) / (Number(formData.num_of_months) || 120)).toFixed(2)} when DP is paid).
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 10 }}>
           <div className="form-group">
@@ -278,7 +370,7 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
               className="form-input mono"
               placeholder="120"
               value={formData.num_of_months}
-              onChange={e => handleContractOrMonthsChange('num_of_months', e.target.value)}
+              onChange={e => handleFieldChange('num_of_months', e.target.value)}
               required
             />
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: 2 }}>

@@ -25,5 +25,6 @@
         <preference name="AndroidPersistentFileLocation" value="Compatibility" />
         <preference name="StatusBarBackgroundColor" value="#0f172a" />
         <preference name="StatusBarStyle" value="lightcontent" />
+        <preference name="loadUrlTimeoutValue" value="70000" />
     </platform>
 </widget>

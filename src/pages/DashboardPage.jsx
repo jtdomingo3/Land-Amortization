@@ -26,9 +26,27 @@ import {
 export function DashboardPage() {
   const { dashboard, accounts, payments, setActiveTab, setSelectedAccountId, addAccount, addPayment, shareDrive, exportExcel, resetSample } = useApp();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentModalConfig, setPaymentModalConfig] = useState({
+    isOpen: false,
+    defaultAccountId: null,
+    defaultPaymentType: 'Installment',
+    defaultAmount: null
+  });
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+
+  const pendingDpAccounts = accounts.filter(
+    a => Number(a.down_payment) > 0 && ((Number(a.total_dp_paid) || 0) < Number(a.down_payment))
+  );
+
+  const openPaymentModal = (accountId = null, type = 'Installment', amount = null) => {
+    setPaymentModalConfig({
+      isOpen: true,
+      defaultAccountId: accountId,
+      defaultPaymentType: type,
+      defaultAmount: amount
+    });
+  };
 
   const handleShareClick = async () => {
     if (window.cordova || (window.plugins && window.plugins.socialsharing)) {
@@ -68,7 +86,7 @@ export function DashboardPage() {
         <button
           className="btn btn-secondary btn-sm"
           style={{ whiteSpace: 'nowrap' }}
-          onClick={() => setIsPaymentModalOpen(true)}
+          onClick={() => openPaymentModal()}
         >
           <CreditCard size={15} />
           Record Payment
@@ -310,6 +328,74 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Pending Down Payments Quick Action Section */}
+      {pendingDpAccounts.length > 0 && (
+        <div className="glass-card" style={{
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.08), rgba(245, 158, 11, 0.08))',
+          border: '1px solid rgba(234, 88, 12, 0.25)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={16} color="#ea580c" />
+              <h3 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#ea580c', textTransform: 'uppercase', margin: 0 }}>
+                Pending Down Payments ({pendingDpAccounts.length})
+              </h3>
+            </div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              Paying DP recomputes & lowers monthly amortization
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pendingDpAccounts.map(acc => {
+              const unpaid = Math.max(0, (Number(acc.down_payment) || 0) - (Number(acc.total_dp_paid) || 0));
+              const reducedAmort = Number((Math.max(0, Number(acc.total_contract_amount || 0) - (Number(acc.total_dp_paid || 0) + unpaid)) / (Number(acc.num_of_months) || 120)).toFixed(2));
+              return (
+                <div
+                  key={acc.account_id}
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                      #{acc.account_id} • {acc.name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      DP Unpaid: <strong style={{ color: '#ea580c' }}>{formatCurrency(unpaid)}</strong> • Monthly will drop from ₱{Number(acc.monthly_amortization).toLocaleString()} to <strong style={{ color: 'var(--accent-emerald-light)' }}>₱{reducedAmort.toLocaleString()}</strong>
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{
+                      background: '#ea580c',
+                      borderColor: '#ea580c',
+                      whiteSpace: 'nowrap',
+                      padding: '5px 12px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700
+                    }}
+                    onClick={() => openPaymentModal(acc.account_id, 'Down Payment', unpaid)}
+                  >
+                    Pay DP ({formatCurrency(unpaid)})
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Monthly Collections Timeline Bar Chart */}
       <MonthlyCollectionsChart payments={payments} />
 
@@ -363,10 +449,13 @@ export function DashboardPage() {
       />
 
       <PaymentFormModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
+        isOpen={paymentModalConfig.isOpen}
+        onClose={() => setPaymentModalConfig(prev => ({ ...prev, isOpen: false }))}
         onSave={addPayment}
         accounts={accounts}
+        defaultAccountId={paymentModalConfig.defaultAccountId}
+        defaultPaymentType={paymentModalConfig.defaultPaymentType}
+        defaultAmount={paymentModalConfig.defaultAmount}
       />
 
       {/* Google Drive Connection & Share Modal */}

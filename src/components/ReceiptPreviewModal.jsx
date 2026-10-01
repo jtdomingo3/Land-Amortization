@@ -5,8 +5,8 @@ import {
   generateAllReceiptsHTML,
   generateSingleReceiptHTML
 } from '../print/receiptGenerator.js';
-import { printDocument } from '../print/printService.js';
-import { X, Share2, Printer, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { printDocument, shareOrSavePdf } from '../print/printService.js';
+import { X, Share2, Printer, RefreshCw, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
 export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPayments = [] }) {
   const [company, setCompany] = useState({});
@@ -44,9 +44,22 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     try {
       const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
       const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
+      await shareOrSavePdf(fullHtml, title);
+    } catch (err) {
+      alert('Could not generate PDF: ' + err.message);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    setIsPrinting(true);
+    try {
+      const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
+      const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
       await printDocument(fullHtml, title);
     } catch (err) {
-      alert('Could not open print/share: ' + err.message);
+      alert('Could not print: ' + err.message);
     } finally {
       setIsPrinting(false);
     }
@@ -151,7 +164,7 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
         </div>
 
         {/* Modal Footer */}
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -160,22 +173,36 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
             Close
           </button>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handlePrintOrShare}
-            disabled={isPrinting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 18px',
-              fontSize: '0.88rem'
-            }}
-          >
-            <Share2 size={16} />
-            <span>{isPrinting ? 'Opening...' : (totalReceipts > 1 ? `Share / Save ${totalReceipts} Receipts (PDF)` : 'Share / Save PDF')}</span>
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handlePrint}
+              disabled={isPrinting}
+              title="Print Receipt"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}
+            >
+              <Printer size={16} />
+              <span className="hide-on-mobile">Print</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handlePrintOrShare}
+              disabled={isPrinting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 18px',
+                fontSize: '0.88rem'
+              }}
+            >
+              {isPrinting ? <RefreshCw size={16} className="spin" /> : <Share2 size={16} />}
+              <span>{isPrinting ? 'Generating PDF...' : (totalReceipts > 1 ? `Share / Save ${totalReceipts} Receipts (PDF)` : 'Share / Save PDF')}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

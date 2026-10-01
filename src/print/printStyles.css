@@ -268,7 +268,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
-  margin-top: 20px;
+  margin-top: 24px;
   padding-top: 10px;
 }
 
@@ -277,40 +277,68 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  position: relative;
 }
 
-.doc-sig-image-container {
-  height: 48px;
+.doc-sig-container {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 68px;
+  padding-bottom: 24px;
+  width: 100%;
+  max-width: 260px;
+}
+
+.doc-sig-buyer-container {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  margin-bottom: -10px;
-  z-index: 2;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 68px;
+  padding-bottom: 24px;
+  width: 100%;
+  max-width: 240px;
 }
 
 .doc-sig-image {
-  max-height: 48px;
-  max-width: 140px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .doc-sig-line {
   width: 100%;
   max-width: 220px;
   border-bottom: 1.5px solid #0f172a;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .doc-sig-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin-top: 2px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  line-height: 1.2;
 }
 
 .doc-sig-title {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: #64748b;
+  margin-top: 2px;
 }
 
 /* Document Footer */

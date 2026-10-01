@@ -12,8 +12,8 @@ import { computeMonthlySchedule } from '../engine/waterfall.js';
  */
 export function generateSOAHTML(account, payments = [], options = {}) {
   const company = options.company || {};
-  const companyName = company.company_name || 'Angeles Land Development Inc.';
-  const companyAddress = company.company_address || 'Sta Elena, Camarines Norte';
+  const companyName = company.company_name || 'CORTEZ LAND AMORTIZATION COLLECTION TRACKER';
+  const companyAddress = company.company_address || 'Purok 2, Brgy. Sta. Elena (Poblacion) Sta. Elena, Camarines Norte';
   const companyContact = company.company_contact || '';
   const companyEmail = company.company_email || '';
   const companyTin = company.company_tin || '';
@@ -315,18 +315,25 @@ export function generateSOAHTML(account, payments = [], options = {}) {
       ${hasSignatory ? `
         <div class="doc-signatures no-break">
           <div class="doc-sig-block">
-            <div class="doc-sig-image-container">
-              ${signatoryEsig ? `<img class="doc-sig-image" src="${signatoryEsig}" alt="Signature" />` : ''}
-            </div>
-            <div class="doc-sig-line"></div>
-            <div class="doc-sig-name">${signatoryName || 'Authorized Signatory'}</div>
-            <div class="doc-sig-title">${signatoryTitle || 'Authorized Representative'}</div>
+            ${signatoryEsig ? `
+              <div class="doc-sig-container">
+                <img class="doc-sig-image" src="${signatoryEsig}" alt="Signature" />
+                <div class="doc-sig-name">${signatoryName || 'ARTEMIO TEDOCO-BARBASA'}</div>
+              </div>
+            ` : `
+              <div class="doc-sig-buyer-container">
+                <div class="doc-sig-line"></div>
+                <div class="doc-sig-name">${signatoryName || 'ARTEMIO TEDOCO-BARBASA'}</div>
+              </div>
+            `}
+            <div class="doc-sig-title">${signatoryTitle || 'Approved by'}</div>
           </div>
 
           <div class="doc-sig-block">
-            <div class="doc-sig-image-container"></div>
-            <div class="doc-sig-line"></div>
-            <div class="doc-sig-name">${account.name}</div>
+            <div class="doc-sig-buyer-container">
+              <div class="doc-sig-line"></div>
+              <div class="doc-sig-name">${account.name}</div>
+            </div>
             <div class="doc-sig-title">Buyer / Conforme</div>
           </div>
         </div>

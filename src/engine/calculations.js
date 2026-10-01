@@ -45,8 +45,13 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     (sum, p) => sum + (Number(p.amount_paid) || 0), 0
   );
 
-  // Total Down Payment Paid (initial account record + any payments tagged as Down Payment)
-  const totalDpPaid = downPayment + dpFromPayments;
+  // Total Down Payment Paid
+  const isDpPaidFlag = account.is_dp_paid === 1 || account.is_dp_paid === true || (account.is_dp_paid === undefined && downPayment > 0 && dpPayments.length === 0);
+  const totalDpPaid = dpPayments.length > 0
+    ? dpFromPayments
+    : (isDpPaidFlag ? downPayment : 0);
+
+  const isDpFullyPaid = downPayment <= 0 || totalDpPaid >= downPayment;
 
   // Column M: Total Paid (all down payments + installments + other payments)
   const totalPaid = totalDpPaid + installmentsPaid + otherPaid;
@@ -57,7 +62,7 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
   // Column O: Down Payment Penalty (1% of Total Contract Amount)
   // Triggered when agreed DP date has lapsed and down payment remains unpaid
   let dpPenalty = 0;
-  if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && totalDpPaid <= 0) {
+  if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && totalDpPaid <= 0 && downPayment > 0) {
     dpPenalty = Math.round(totalContract * 0.01 * 100) / 100;
   }
 
@@ -141,6 +146,7 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
 
   return {
     ...account,
+    is_dp_paid: isDpFullyPaid ? 1 : 0,
     total_dp_paid: totalDpPaid,
     installments_paid: installmentsPaid,
     total_paid: totalPaid,

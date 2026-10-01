@@ -237,6 +237,18 @@ export function AccountsPage() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {account.down_payment > 0 && Number(account.total_dp_paid || 0) < Number(account.down_payment) && (
+                      <span style={{
+                        background: 'rgba(234, 88, 12, 0.15)',
+                        color: '#ea580c',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontWeight: 700,
+                        fontSize: '0.68rem'
+                      }}>
+                        DP Unpaid
+                      </span>
+                    )}
                     {isOverdue && (
                       <span style={{
                         background: 'rgba(245, 158, 11, 0.15)',

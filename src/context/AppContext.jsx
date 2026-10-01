@@ -132,6 +132,20 @@ export function AppProvider({ children }) {
   // CRUD Actions
   const handleAddAccount = async (accountData) => {
     await insertAccount(accountData);
+
+    // If down payment is marked as paid upfront, automatically create initial Down Payment payment record
+    if (Number(accountData.is_dp_paid) === 1 && Number(accountData.down_payment) > 0) {
+      await insertPayment({
+        account_id: accountData.account_id,
+        payment_date: accountData.date_of_start || toISODateString(new Date()),
+        payment_type: 'Down Payment',
+        amount_paid: Number(accountData.down_payment),
+        receipt_no: `DP-${accountData.account_id}`,
+        payment_method: 'Cash',
+        remarks: 'Initial Down Payment'
+      });
+    }
+
     await refreshData();
   };
 
@@ -147,6 +161,29 @@ export function AppProvider({ children }) {
 
   const handleAddPayment = async (paymentData) => {
     await insertPayment(paymentData);
+
+    // If payment is a Down Payment, recompute and reduce monthly amortization on the account
+    if (paymentData.payment_type === 'Down Payment') {
+      const acc = rawAccounts.find(a => String(a.account_id) === String(paymentData.account_id));
+      if (acc) {
+        const priorDpPayments = rawPayments.filter(
+          p => String(p.account_id) === String(acc.account_id) && p.payment_type === 'Down Payment'
+        );
+        const priorDpPaid = priorDpPayments.reduce((s, p) => s + (Number(p.amount_paid) || 0), 0);
+        const newTotalDpPaid = priorDpPaid + (Number(paymentData.amount_paid) || 0);
+
+        const contract = Number(acc.total_contract_amount) || 0;
+        const months = Number(acc.num_of_months) || 120;
+        const newMonthly = Number((Math.max(0, contract - newTotalDpPaid) / months).toFixed(2));
+
+        await dbUpdateAccount({
+          ...acc,
+          monthly_amortization: newMonthly,
+          is_dp_paid: 1
+        });
+      }
+    }
+
     await refreshData();
   };
 
@@ -156,7 +193,29 @@ export function AppProvider({ children }) {
   };
 
   const handleDeletePayment = async (paymentId) => {
+    const paymentToDelete = rawPayments.find(p => p.payment_id === paymentId);
     await dbDeletePayment(paymentId);
+
+    if (paymentToDelete && paymentToDelete.payment_type === 'Down Payment') {
+      const acc = rawAccounts.find(a => String(a.account_id) === String(paymentToDelete.account_id));
+      if (acc) {
+        const remainingDpPayments = rawPayments.filter(
+          p => p.payment_id !== paymentId && String(p.account_id) === String(acc.account_id) && p.payment_type === 'Down Payment'
+        );
+        const remainingDpPaid = remainingDpPayments.reduce((s, p) => s + (Number(p.amount_paid) || 0), 0);
+        const contract = Number(acc.total_contract_amount) || 0;
+        const months = Number(acc.num_of_months) || 120;
+        const isPaid = remainingDpPaid >= (Number(acc.down_payment) || 0) && remainingDpPaid > 0;
+        const newMonthly = Number((Math.max(0, contract - remainingDpPaid) / months).toFixed(2));
+
+        await dbUpdateAccount({
+          ...acc,
+          monthly_amortization: newMonthly,
+          is_dp_paid: isPaid ? 1 : 0
+        });
+      }
+    }
+
     await refreshData();
   };
 

@@ -12,6 +12,7 @@ export const CREATE_TABLE_ACCOUNTS = `
     monthly_amortization  REAL NOT NULL,
     num_of_months         INTEGER NOT NULL DEFAULT 120,
     remarks               TEXT,
+    is_dp_paid            INTEGER DEFAULT 0,
     created_at            TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at            TEXT DEFAULT CURRENT_TIMESTAMP
   );

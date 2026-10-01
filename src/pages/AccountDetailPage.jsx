@@ -32,7 +32,11 @@ export function AccountDetailPage({ accountId, onBack }) {
   } = useApp();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentModalConfig, setPaymentModalConfig] = useState({
+    isOpen: false,
+    defaultPaymentType: 'Installment',
+    defaultAmount: null
+  });
   const [isSOAModalOpen, setIsSOAModalOpen] = useState(false);
   const [selectedReceiptPayment, setSelectedReceiptPayment] = useState(null);
 
@@ -48,6 +52,16 @@ export function AccountDetailPage({ accountId, onBack }) {
       </div>
     );
   }
+
+  const unpaidDp = Math.max(0, (Number(account.down_payment) || 0) - (Number(account.total_dp_paid) || 0));
+
+  const openPaymentModal = (type = 'Installment', amount = null) => {
+    setPaymentModalConfig({
+      isOpen: true,
+      defaultPaymentType: type,
+      defaultAmount: amount
+    });
+  };
 
   const accountPayments = payments.filter(
     p => String(p.account_id) === String(account.account_id)
@@ -167,16 +181,72 @@ export function AccountDetailPage({ accountId, onBack }) {
         </div>
       </div>
 
+      {/* Down Payment Pending Alert Banner */}
+      {unpaidDp > 0 && (
+        <div style={{
+          background: 'rgba(234, 88, 12, 0.1)',
+          border: '1px solid rgba(234, 88, 12, 0.3)',
+          borderRadius: 10,
+          padding: '12px 14px',
+          marginBottom: 14,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertCircle size={16} />
+              <span>Down Payment Pending: {formatCurrency(unpaidDp)}</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+              Current amortization: <strong>{formatCurrency(account.monthly_amortization)}</strong>. Paying DP reduces it to <strong>{formatCurrency(Math.max(0, Number(account.total_contract_amount || 0) - (Number(account.total_dp_paid || 0) + unpaidDp)) / (Number(account.num_of_months) || 120))}</strong>/mo.
+            </div>
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ background: '#ea580c', borderColor: '#ea580c', color: '#fff', fontWeight: 700 }}
+            onClick={() => openPaymentModal('Down Payment', unpaidDp)}
+          >
+            Pay Down Payment
+          </button>
+        </div>
+      )}
+
       {/* Quick Action Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <button className="btn btn-primary" onClick={() => setIsPaymentModalOpen(true)}>
-          <CreditCard size={16} />
-          Record Payment
-        </button>
-        <button className="btn btn-secondary" onClick={handleViewSchedule}>
-          <CalendarRange size={16} />
-          Monthly Schedule
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        {unpaidDp > 0 && (
+          <button
+            className="btn btn-secondary"
+            style={{
+              background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.15), rgba(249, 115, 22, 0.22))',
+              borderColor: 'rgba(234, 88, 12, 0.5)',
+              color: '#ea580c',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              fontSize: '0.88rem'
+            }}
+            onClick={() => openPaymentModal('Down Payment', unpaidDp)}
+          >
+            <CreditCard size={16} />
+            <span>Pay Down Payment ({formatCurrency(unpaidDp)})</span>
+          </button>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="btn btn-primary" onClick={() => openPaymentModal('Installment')}>
+            <CreditCard size={16} />
+            Record Payment
+          </button>
+          <button className="btn btn-secondary" onClick={handleViewSchedule}>
+            <CalendarRange size={16} />
+            Schedule
+          </button>
+        </div>
       </div>
 
       <button
@@ -207,10 +277,19 @@ export function AccountDetailPage({ accountId, onBack }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: '0.8rem' }}>
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Down Payment Paid</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Down Payment</span>
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>
               {formatCurrency(account.total_dp_paid ?? account.down_payment)}
             </div>
+            {unpaidDp > 0 ? (
+              <span style={{ fontSize: '0.64rem', color: '#ea580c', display: 'block', marginTop: 1, fontWeight: 700 }}>
+                Unpaid: {formatCurrency(unpaidDp)}
+              </span>
+            ) : account.down_payment > 0 ? (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-emerald)', display: 'block', marginTop: 1, fontWeight: 600 }}>
+                ✓ Fully Paid
+              </span>
+            ) : null}
           </div>
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Installments Paid</span>
@@ -360,11 +439,13 @@ export function AccountDetailPage({ accountId, onBack }) {
 
       {/* Add Payment Modal */}
       <PaymentFormModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
+        isOpen={paymentModalConfig.isOpen}
+        onClose={() => setPaymentModalConfig(prev => ({ ...prev, isOpen: false }))}
         onSave={addPayment}
         accounts={accounts}
         defaultAccountId={account.account_id}
+        defaultPaymentType={paymentModalConfig.defaultPaymentType}
+        defaultAmount={paymentModalConfig.defaultAmount}
       />
 
       {/* Statement of Account (SOA) Modal */}

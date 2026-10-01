@@ -9,14 +9,16 @@ export function PaymentFormModal({
   onSave,
   editPayment = null,
   accounts = [],
-  defaultAccountId = null
+  defaultAccountId = null,
+  defaultPaymentType = 'Installment',
+  defaultAmount = null
 }) {
   const [formData, setFormData] = useState({
     payment_id: null,
     account_id: defaultAccountId || '',
     payment_date: toISODateString(new Date()),
-    payment_type: 'Installment',
-    amount_paid: '',
+    payment_type: defaultPaymentType || 'Installment',
+    amount_paid: defaultAmount || '',
     receipt_no: '',
     payment_method: 'Cash',
     remarks: ''
@@ -38,26 +40,76 @@ export function PaymentFormModal({
       });
     } else {
       const selectedAcc = accounts.find(a => String(a.account_id) === String(defaultAccountId)) || accounts[0];
+      const pType = defaultPaymentType || 'Installment';
+      let initAmount = defaultAmount !== null ? defaultAmount : '';
+
+      if (!initAmount && selectedAcc) {
+        if (pType === 'Down Payment') {
+          const agreedDp = Number(selectedAcc.down_payment) || 0;
+          const paidDp = Number(selectedAcc.total_dp_paid) || 0;
+          const unpaidDp = Math.max(0, agreedDp - paidDp);
+          initAmount = unpaidDp > 0 ? unpaidDp : (agreedDp > 0 ? agreedDp : '');
+        } else {
+          initAmount = selectedAcc.monthly_amortization || '';
+        }
+      }
+
       setFormData({
         payment_id: null,
         account_id: selectedAcc ? selectedAcc.account_id : '',
         payment_date: toISODateString(new Date()),
-        payment_type: 'Installment',
-        amount_paid: selectedAcc ? selectedAcc.monthly_amortization : '',
+        payment_type: pType,
+        amount_paid: initAmount,
         receipt_no: '',
         payment_method: 'Cash',
-        remarks: ''
+        remarks: pType === 'Down Payment' ? 'Down Payment' : ''
       });
     }
     setError('');
-  }, [editPayment, defaultAccountId, accounts, isOpen]);
+  }, [editPayment, defaultAccountId, accounts, isOpen, defaultPaymentType, defaultAmount]);
 
   const handleAccountChange = (accId) => {
     const selectedAcc = accounts.find(a => String(a.account_id) === String(accId));
+    let newAmount = formData.amount_paid;
+    if (selectedAcc) {
+      if (formData.payment_type === 'Down Payment') {
+        const agreedDp = Number(selectedAcc.down_payment) || 0;
+        const paidDp = Number(selectedAcc.total_dp_paid) || 0;
+        const unpaidDp = Math.max(0, agreedDp - paidDp);
+        newAmount = unpaidDp > 0 ? unpaidDp : (agreedDp > 0 ? agreedDp : '');
+      } else if (!formData.amount_paid || formData.payment_type === 'Installment') {
+        newAmount = selectedAcc.monthly_amortization || '';
+      }
+    }
     setFormData(prev => ({
       ...prev,
       account_id: accId,
-      amount_paid: prev.amount_paid ? prev.amount_paid : (selectedAcc ? selectedAcc.monthly_amortization : '')
+      amount_paid: newAmount
+    }));
+  };
+
+  const handlePaymentTypeChange = (newType) => {
+    const selectedAcc = accounts.find(a => String(a.account_id) === String(formData.account_id));
+    let suggestedAmount = formData.amount_paid;
+
+    if (newType === 'Down Payment') {
+      if (selectedAcc) {
+        const agreedDp = Number(selectedAcc.down_payment) || 0;
+        const paidDp = Number(selectedAcc.total_dp_paid) || 0;
+        const unpaidDp = Math.max(0, agreedDp - paidDp);
+        suggestedAmount = unpaidDp > 0 ? unpaidDp : (agreedDp > 0 ? agreedDp : '');
+      }
+    } else if (newType === 'Installment') {
+      if (selectedAcc) {
+        suggestedAmount = selectedAcc.monthly_amortization || '';
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      payment_type: newType,
+      amount_paid: suggestedAmount,
+      remarks: newType === 'Down Payment' && !prev.remarks ? 'Down Payment' : prev.remarks
     }));
   };
 
@@ -164,7 +216,7 @@ export function PaymentFormModal({
             <select
               className="form-select"
               value={formData.payment_type}
-              onChange={e => setFormData({ ...formData, payment_type: e.target.value })}
+              onChange={e => handlePaymentTypeChange(e.target.value)}
             >
               {PAYMENT_TYPES.map(t => (
                 <option key={t} value={t}>{t}</option>
@@ -172,6 +224,21 @@ export function PaymentFormModal({
             </select>
           </div>
         </div>
+
+        {formData.payment_type === 'Down Payment' && (
+          <div style={{
+            background: 'rgba(6, 182, 212, 0.08)',
+            border: '1px solid rgba(6, 182, 212, 0.25)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            marginBottom: 14,
+            fontSize: '0.74rem',
+            color: 'var(--accent-cyan)',
+            lineHeight: 1.45
+          }}>
+            ℹ️ <strong>Down Payment:</strong> Recording this payment will be credited to the principal and will automatically recompute and reduce the monthly amortization for this account.
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
           <div className="form-group">
