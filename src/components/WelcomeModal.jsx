@@ -24,12 +24,10 @@ export function WelcomeModal({ isOpenManual, onCloseManual }) {
   }, [isOpenManual]);
 
   const handleClose = () => {
-    if (dontShowAgain) {
-      try {
-        localStorage.setItem('land_amortization_hide_welcome', 'true');
-      } catch (e) {
-        console.warn('Could not save preference', e);
-      }
+    try {
+      localStorage.setItem('land_amortization_hide_welcome', 'true');
+    } catch (e) {
+      console.warn('Could not save preference', e);
     }
     setIsOpen(false);
     if (onCloseManual) onCloseManual();

@@ -101,8 +101,19 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
       setError('Monthly amortization must be greater than zero');
       return;
     }
+    if (!formData.num_of_months || Number(formData.num_of_months) <= 0) {
+      setError('Number of months must be greater than zero');
+      return;
+    }
 
-    onSave(formData);
+    onSave({
+      ...formData,
+      num_of_months: Number(formData.num_of_months) || 120,
+      total_contract_amount: Number(formData.total_contract_amount) || 0,
+      down_payment: Number(formData.down_payment) || 0,
+      monthly_amortization: Number(formData.monthly_amortization) || 0,
+      land_area_sqm: Number(formData.land_area_sqm) || 0
+    });
     onClose();
   };
 
@@ -261,14 +272,18 @@ export function AccountFormModal({ isOpen, onClose, onSave, editAccount = null, 
           </div>
 
           <div className="form-group">
-            <label className="form-label">Months</label>
+            <label className="form-label">Term (Months) *</label>
             <input
               type="number"
               className="form-input mono"
               placeholder="120"
               value={formData.num_of_months}
               onChange={e => handleContractOrMonthsChange('num_of_months', e.target.value)}
+              required
             />
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: 2 }}>
+              120 (10 yrs) / 180 (15 yrs)
+            </span>
           </div>
         </div>
 

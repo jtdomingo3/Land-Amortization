@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
+import { AccountFormModal } from './AccountFormModal.jsx';
 import {
   CalendarRange,
   Search,
@@ -9,13 +10,15 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Edit2
 } from 'lucide-react';
 
 export function SchedulePage() {
-  const { accounts, selectedAccountId, setSelectedAccountId } = useApp();
+  const { accounts, selectedAccountId, setSelectedAccountId, updateAccount } = useApp();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [visibleCount, setVisibleCount] = useState(24); // Show 24 months at a time for fast rendering
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Find currently selected account
   const currentAccount = useMemo(() => {
@@ -86,7 +89,18 @@ export function SchedulePage() {
               Monthly Due: <strong>{formatCurrency(currentAccount.monthly_amortization)}</strong> • Term: {currentAccount.num_of_months || 120} months
             </div>
           </div>
-          <StatusBadge status={currentAccount.status} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <StatusBadge status={currentAccount.status} />
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsEditModalOpen(true)}
+              style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <Edit2 size={12} />
+              Edit Term
+            </button>
+          </div>
         </div>
 
         <div style={{
@@ -246,6 +260,17 @@ export function SchedulePage() {
           <ChevronDown size={16} />
           Load Next 24 Months ({visibleRows.length} of {filteredSchedule.length})
         </button>
+      )}
+
+      {/* Edit Account / Term Modal */}
+      {currentAccount && (
+        <AccountFormModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={updateAccount}
+          editAccount={currentAccount}
+          existingAccounts={accounts}
+        />
       )}
     </div>
   );
