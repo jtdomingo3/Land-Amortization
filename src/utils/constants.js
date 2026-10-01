@@ -32,7 +32,7 @@ export const INSTRUCTIONS = [
 
 export const PENALTY_RULES = [
   "1. Down payment penalty: 1% of total contract amount if the down payment is still unpaid after the agreed due date.",
-  "2. 2+ consecutive missed months: 10% of the remaining base balance.",
+  "2. 2+ consecutive missed months: 10% penalty on the delayed monthly installments.",
   "3. Advance payments are applied to the earliest unpaid installments first.",
   "4. Total Amount Due = Base Balance + applicable penalties."
 ];

@@ -182,7 +182,9 @@ export function AccountDetailPage({ accountId, onBack }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: '0.8rem' }}>
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Down Payment Paid</span>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>{formatCurrency(account.down_payment)}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>
+              {formatCurrency(account.total_dp_paid ?? account.down_payment)}
+            </div>
           </div>
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Installments Paid</span>
@@ -201,6 +203,11 @@ export function AccountDetailPage({ accountId, onBack }) {
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, color: account.dp_penalty > 0 ? 'var(--accent-rose)' : 'inherit' }}>
               {formatCurrency(account.dp_penalty)}
             </div>
+            {account.dp_penalty > 0 && (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-rose)', display: 'block', marginTop: 1 }}>
+                1% of contract ({formatCurrency(account.total_contract_amount)})
+              </span>
+            )}
           </div>
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Consecutive Missed</span>
@@ -213,6 +220,11 @@ export function AccountDetailPage({ accountId, onBack }) {
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, color: account.ten_percent_penalty > 0 ? 'var(--accent-rose)' : 'inherit' }}>
               {formatCurrency(account.ten_percent_penalty)}
             </div>
+            {account.ten_percent_penalty > 0 && (
+              <span style={{ fontSize: '0.64rem', color: 'var(--accent-rose)', display: 'block', marginTop: 1 }}>
+                10% of {formatCurrency(account.delayed_months_amount)} delayed
+              </span>
+            )}
           </div>
           <div style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244,63,94,0.2)', padding: 8, borderRadius: 6 }}>
             <span style={{ color: '#fb7185', fontSize: '0.72rem' }}>Total Penalties</span>
