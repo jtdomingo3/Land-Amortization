@@ -1,6 +1,6 @@
 # Land Amortization Tracker
 
-An offline-first Android mobile application and financial tracker for real estate land sales and installment amortizations. Replicates the exact mathematical calculation engine, penalty formulas, and 5-sheet tabular structure of the master Excel model (`Land_Amortization_Tracker_Updated_Penalties_Advance.xlsx`).
+An offline-first Android mobile application and financial tracker for real estate land sales and installment amortizations. 
 
 ---
 
@@ -96,20 +96,26 @@ The calculation engine replicates the Excel formulas:
 ## Getting Started & Development
 
 ### 1. Prerequisites
+
 - **Node.js**: v18.x or v20.x
 - **npm**: v9.x or v10.x
 - **Java Development Kit (JDK)**: JDK 17 (recommended for Cordova Android 12+)
 - **Android SDK**: Android 14 (API Level 34) platform and build-tools installed via Android Studio or command-line tools.
 
 ### 2. Local Browser Preview
+
 To run the development server with Hot Module Replacement (HMR):
+
 ```bash
 npm run dev
 ```
+
 Open [http://localhost:5173/](http://localhost:5173/) in your web browser.
 
 ### 3. Build Web Bundle
+
 To compile the React source into the `www/` directory:
+
 ```bash
 npm run build
 ```
@@ -119,21 +125,24 @@ npm run build
 ## Compiling the Android APK
 
 1. **Ensure Cordova Android platform is prepared**:
+
    ```bash
    npm run build
    npx cordova prepare android
    ```
-
 2. **Build Debug APK**:
+
    ```bash
    npx cordova build android
    ```
+
    The compiled APK will be located at:
+
    ```text
    platforms/android/app/build/outputs/apk/debug/app-debug.apk
    ```
-
 3. **Install & Run on a Connected Android Device or Emulator**:
+
    ```bash
    npx cordova run android
    ```

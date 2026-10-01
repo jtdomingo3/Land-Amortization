@@ -234,6 +234,23 @@ function setupIpcHandlers() {
     return app.getPath(name);
   });
 
+  // Developer Mode IPC Handlers
+  ipcMain.handle('dev:toggleDevTools', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.toggleDevTools();
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle('dev:reload', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.reload();
+      return true;
+    }
+    return false;
+  });
+
   // Desktop Native Print (Bypasses broken Chromium print preview, invokes system print dialog)
   ipcMain.handle('print:html', async (_event, htmlContent, options = {}) => {
     return new Promise((resolve) => {
@@ -446,6 +463,37 @@ function createWindow() {
 
   // Remove default menu bar for clean modern Windows desktop look
   mainWindow.removeMenu();
+
+  // Developer Mode Shortcuts: F12 or Ctrl+Shift+I to toggle DevTools, F5 or Ctrl+R to reload
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+
+    const isCtrlShiftI = (input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i';
+    const isF12 = input.key === 'F12';
+    if (isCtrlShiftI || isF12) {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+      return;
+    }
+
+    const isCtrlR = (input.control || input.meta) && input.key.toLowerCase() === 'r';
+    const isF5 = input.key === 'F5';
+    if (isCtrlR || isF5) {
+      mainWindow.webContents.reload();
+      event.preventDefault();
+      return;
+    }
+  });
+
+  // Forward renderer console errors and warnings directly to Electron terminal stdout
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    const lvlName = levels[level] || 'LOG';
+    if (level >= 2) {
+      const srcName = sourceId ? path.basename(sourceId) : 'renderer';
+      console.log(`[Renderer ${lvlName}] ${message} (${srcName}:${line})`);
+    }
+  });
 
   // Route any window.open / target="_blank" links safely into Windows default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

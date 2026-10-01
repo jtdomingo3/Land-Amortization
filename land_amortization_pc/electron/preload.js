@@ -26,5 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   excel: {
     saveDirect: (fileName, data) => ipcRenderer.invoke('excel:saveDirect', fileName, data),
     getExcelDir: () => ipcRenderer.invoke('excel:getExcelDir')
+  },
+  dev: {
+    toggleDevTools: () => ipcRenderer.invoke('dev:toggleDevTools'),
+    reload: () => ipcRenderer.invoke('dev:reload')
   }
 });

@@ -8,6 +8,7 @@ import { PaymentsPage } from './pages/PaymentsPage.jsx';
 import { SchedulePage } from './pages/SchedulePage.jsx';
 import { ExportSharePage } from './pages/ExportSharePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
+import { HelpPage } from './pages/HelpPage.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import { Loader2 } from 'lucide-react';
 import { syncWithSupabase } from './services/supabaseSync.js';
@@ -73,7 +74,7 @@ export function App() {
       case 'settings':
         return <SettingsPage />;
       case 'help':
-        return <SettingsPage defaultOpenHelp={true} />;
+        return <HelpPage />;
       default:
         return <DashboardPage />;
     }

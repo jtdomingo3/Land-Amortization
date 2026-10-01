@@ -7,7 +7,6 @@ import {
   fileToBase64,
   DEFAULT_COMPANY
 } from '../print/companyConfig.js';
-import { INSTRUCTIONS, PENALTY_RULES } from '../utils/constants.js';
 import {
   Building2,
   Upload,
@@ -17,10 +16,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   HelpCircle,
-  WifiOff,
-  Cloud,
-  ChevronDown,
-  ChevronUp,
   Sparkles,
   Image as ImageIcon,
   PenTool,
@@ -28,7 +23,8 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  Terminal
+  Terminal,
+  Cloud
 } from 'lucide-react';
 import {
   getSupabaseConfig,
@@ -38,13 +34,12 @@ import {
   SUPABASE_SQL_SCHEMA
 } from '../services/supabaseSync.js';
 
-export function SettingsPage({ defaultOpenHelp = false }) {
-  const { resetSample, clearAll, refreshData } = useApp();
+export function SettingsPage() {
+  const { resetSample, clearAll, refreshData, setActiveTab } = useApp();
 
   const [form, setForm] = useState(DEFAULT_COMPANY);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(null); // { type: 'success'|'error', message: '' }
-  const [isHelpOpen, setIsHelpOpen] = useState(defaultOpenHelp);
   const [isDataActionLoading, setIsDataActionLoading] = useState(false);
 
   // Supabase Cloud Sync State
@@ -793,89 +788,49 @@ export function SettingsPage({ defaultOpenHelp = false }) {
         </div>
       </div>
 
-      {/* 5. Collapsible Instructions & Usage Guide (Help) */}
-      <div className="glass-card">
-        <button
-          type="button"
-          onClick={() => setIsHelpOpen(!isHelpOpen)}
-          style={{
-            width: '100%',
-            background: 'none',
-            border: 'none',
-            padding: 0,
+      {/* 5. User Guide Quick Link Banner */}
+      <div className="glass-card" style={{
+        marginTop: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        padding: '16px 20px',
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.08))',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: 'var(--radius-lg)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, var(--accent-emerald), var(--accent-cyan))',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            textAlign: 'left'
-          }}
+            justifyContent: 'center',
+            color: '#fff',
+            flexShrink: 0
+          }}>
+            <HelpCircle size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Looking for System Usage & Calculation Rules?
+            </div>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+              Detailed waterfall calculation logic, penalty rules, official usage instructions, and print guides are located in the User Guide tab.
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setActiveTab('help')}
+          style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <HelpCircle size={18} color="var(--accent-emerald)" />
-            <div>
-              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Instructions & System Guide
-              </span>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Offline architecture, waterfall calculation rules & penalties
-              </div>
-            </div>
-          </div>
-          {isHelpOpen ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+          <span>Open User Guide</span>
         </button>
-
-        {isHelpOpen && (
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            
-            {/* Offline Callout */}
-            <div style={{ background: 'var(--bg-card-subtle)', padding: 12, borderRadius: 8, borderLeft: '3px solid var(--accent-emerald)' }}>
-              <div style={{ display: 'flex', gap: 8, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                <WifiOff size={16} color="var(--accent-emerald)" style={{ flexShrink: 0, marginTop: 2 }} />
-                <div>
-                  <strong style={{ color: 'var(--text-primary)' }}>100% Offline SQLite: </strong>
-                  Accounts and payments are saved securely in local storage. All waterfall amortization math computes on-device without internet.
-                </div>
-              </div>
-            </div>
-
-            {/* Official Usage Instructions */}
-            <div>
-              <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: 8, textTransform: 'uppercase' }}>
-                Usage Instructions
-              </h4>
-              <ol style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {INSTRUCTIONS.map((item, idx) => (
-                  <li key={idx} style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                    {item.replace(/^\d+\.\s*/, '')}
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {/* Penalty Rules */}
-            <div>
-              <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-rose)', marginBottom: 8, textTransform: 'uppercase' }}>
-                Penalty Rules
-              </h4>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {PENALTY_RULES.map((rule, idx) => (
-                  <li key={idx} style={{
-                    fontSize: '0.76rem',
-                    color: 'var(--text-secondary)',
-                    background: 'var(--bg-card-subtle)',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    borderLeft: '3px solid var(--accent-rose)',
-                    lineHeight: 1.4
-                  }}>
-                    {rule}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-          </div>
-        )}
       </div>
 
       {/* 6. App Info & Author Footer */}
