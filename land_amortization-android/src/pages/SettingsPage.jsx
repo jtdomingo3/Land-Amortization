@@ -25,17 +25,40 @@ import {
   Info,
   Sparkles,
   Image as ImageIcon,
-  PenTool
+  PenTool,
+  Eye,
+  EyeOff,
+  Terminal,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
+import {
+  getSupabaseConfig,
+  saveSupabaseConfig,
+  testSupabaseConnection,
+  syncWithSupabase,
+  SUPABASE_SQL_SCHEMA
+} from '../services/supabaseSync.js';
+import { formatLastSync } from '../utils/formatters.js';
 
 export function SettingsPage({ defaultOpenHelp = false }) {
-  const { resetSample, clearAll } = useApp();
+  const { resetSample, clearAll, refreshData } = useApp();
 
   const [form, setForm] = useState(DEFAULT_COMPANY);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(null); // { type: 'success'|'error', message: '' }
   const [isHelpOpen, setIsHelpOpen] = useState(defaultOpenHelp);
   const [isDataActionLoading, setIsDataActionLoading] = useState(false);
+
+  // Supabase Configuration State
+  const [sbConfig, setSbConfig] = useState(getSupabaseConfig);
+  const [sbNotice, setSbNotice] = useState(null);
+  const [isTestingSb, setIsTestingSb] = useState(false);
+  const [isSyncingSb, setIsSyncingSb] = useState(false);
+  const [showSbKey, setShowSbKey] = useState(false);
+  const [showSbUrl, setShowSbUrl] = useState(false);
+  const [showSchema, setShowSchema] = useState(false);
+  const [copiedSchema, setCopiedSchema] = useState(false);
 
   const logoInputRef = useRef(null);
   const esigInputRef = useRef(null);
@@ -114,6 +137,61 @@ export function SettingsPage({ defaultOpenHelp = false }) {
       handleChange('signatory_esig', b64);
     } catch (err) {
       alert('Failed to read signature image: ' + err.message);
+    }
+  };
+
+  const handleSaveSbConfig = () => {
+    saveSupabaseConfig(sbConfig);
+    setSbNotice({ type: 'success', message: 'Supabase credentials saved successfully!' });
+    setTimeout(() => setSbNotice(null), 4000);
+  };
+
+  const handleTestSb = async () => {
+    saveSupabaseConfig(sbConfig);
+    setIsTestingSb(true);
+    setSbNotice(null);
+    try {
+      const res = await testSupabaseConnection();
+      if (res.success) {
+        setSbNotice({ type: 'success', message: 'Connection test passed! Supabase is reachable and ready.' });
+      } else {
+        setSbNotice({ type: 'error', message: res.message });
+        if (res.needsMigration) setShowSchema(true);
+      }
+    } catch (e) {
+      setSbNotice({ type: 'error', message: e.message });
+    } finally {
+      setIsTestingSb(false);
+    }
+  };
+
+  const handleSyncSb = async () => {
+    saveSupabaseConfig(sbConfig);
+    setIsSyncingSb(true);
+    setSbNotice(null);
+    try {
+      const res = await syncWithSupabase();
+      if (res.success) {
+        setSbNotice({ type: 'success', message: res.message });
+        setSbConfig(getSupabaseConfig());
+        await refreshData();
+      } else {
+        setSbNotice({ type: 'error', message: res.message });
+      }
+    } catch (e) {
+      setSbNotice({ type: 'error', message: e.message });
+    } finally {
+      setIsSyncingSb(false);
+    }
+  };
+
+  const handleCopySchema = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+      setCopiedSchema(true);
+      setTimeout(() => setCopiedSchema(false), 3000);
+    } catch {
+      alert('Failed to copy schema to clipboard.');
     }
   };
 
@@ -479,6 +557,198 @@ export function SettingsPage({ defaultOpenHelp = false }) {
           <span>Save Company Settings</span>
         </button>
       </form>
+
+      {/* 3.5 Supabase Cloud Synchronization */}
+      <div className="glass-card" style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Cloud size={22} color="var(--accent-emerald)" style={{ flexShrink: 0 }} />
+            <div>
+              <h3 style={{
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+                margin: 0
+              }}>
+                Supabase Cloud Database & Sync
+              </h3>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Connect this mobile app to Supabase PostgreSQL to keep your accounts and payments in sync with PC.
+              </p>
+            </div>
+          </div>
+          {sbConfig.lastSyncedAt && (
+            <span style={{ fontSize: '0.74rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: 6, fontWeight: 600, alignSelf: 'flex-start' }}>
+              Last Synced: {formatLastSync(sbConfig.lastSyncedAt)}
+            </span>
+          )}
+        </div>
+
+        {sbNotice && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 14,
+            fontSize: '0.8rem',
+            fontWeight: 500,
+            background: sbNotice.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+            color: sbNotice.type === 'success' ? 'var(--accent-emerald)' : '#fb7185',
+            border: `1px solid ${sbNotice.type === 'success' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)'}`
+          }}>
+            {sbNotice.message}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.76rem' }}>Supabase Project URL</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showSbUrl ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingRight: 36, width: '100%', boxSizing: 'border-box' }}
+                placeholder="https://your-project-id.supabase.co"
+                value={sbConfig.url}
+                onChange={e => setSbConfig(prev => ({ ...prev, url: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSbUrl(!showSbUrl)}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 4
+                }}
+                title={showSbUrl ? 'Hide Project URL' : 'Show Project URL'}
+              >
+                {showSbUrl ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.76rem' }}>Supabase API Key (Anon / Publishable)</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showSbKey ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingRight: 36, width: '100%', boxSizing: 'border-box' }}
+                placeholder="sb_publishable_... or API key"
+                value={sbConfig.key}
+                onChange={e => setSbConfig(prev => ({ ...prev, key: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSbKey(!showSbKey)}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 4
+                }}
+                title={showSbKey ? 'Hide API Key' : 'Show API Key'}
+              >
+                {showSbKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleSaveSbConfig}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Save size={14} />
+              <span>Save</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleTestSb}
+              disabled={isTestingSb}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <CheckCircle2 size={14} color="var(--accent-emerald)" />
+              <span>{isTestingSb ? 'Testing...' : 'Test Connection'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleSyncSb}
+              disabled={isSyncingSb}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <RefreshCw size={14} className={isSyncingSb ? 'animate-spin' : ''} />
+              <span>{isSyncingSb ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowSchema(!showSchema)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Terminal size={14} />
+            <span>{showSchema ? 'Hide SQL' : 'SQL Schema'}</span>
+          </button>
+        </div>
+
+        {showSchema && (
+          <div style={{
+            marginTop: 14,
+            padding: 12,
+            background: 'var(--bg-main)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                Run in Supabase SQL Editor:
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleCopySchema}
+                style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+              >
+                <Copy size={13} />
+                <span>{copiedSchema ? 'Copied!' : 'Copy SQL'}</span>
+              </button>
+            </div>
+            <pre style={{
+              fontSize: '0.72rem',
+              fontFamily: 'var(--font-mono)',
+              background: '#090d16',
+              color: '#34d399',
+              padding: 12,
+              borderRadius: 6,
+              overflowX: 'auto',
+              maxHeight: 220
+            }}>
+              {SUPABASE_SQL_SCHEMA}
+            </pre>
+          </div>
+        )}
+      </div>
 
       {/* 4. Data Management Section */}
       <div className="glass-card" style={{ marginTop: 8 }}>

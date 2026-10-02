@@ -80,3 +80,38 @@ export function toISODateString(dateVal) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Format timestamp for Last Synced display showing both date and time
+ * (e.g., "Today, 11:22 AM" or "Oct 2, 2026, 11:22 AM")
+ * @param {string|Date} dateVal 
+ * @returns {string}
+ */
+export function formatLastSync(dateVal) {
+  if (!dateVal) return 'Never synced';
+  const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+  if (isNaN(d.getTime())) return 'Never synced';
+
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${timeStr}`;
+  }
+
+  const isThisYear = d.getFullYear() === now.getFullYear();
+  const dateStr = d.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    ...(isThisYear ? {} : { year: 'numeric' })
+  });
+
+  return `${dateStr}, ${timeStr}`;
+}

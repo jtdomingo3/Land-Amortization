@@ -27,6 +27,7 @@
         <preference name="StatusBarStyle" value="lightcontent" />
         <preference name="loadUrlTimeoutValue" value="70000" />
         <preference name="SplashScreenBackgroundColor" value="#0f172a" />
-        <splash src="public/logo.png" />
+        <preference name="AndroidWindowSplashScreenBackground" value="#0f172a" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="public/logo.png" />
     </platform>
 </widget>

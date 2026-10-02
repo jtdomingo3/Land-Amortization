@@ -2,13 +2,24 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getCompanySettings } from '../print/companyConfig.js';
 import { generateSOAHTML } from '../print/soaGenerator.js';
 import { printDocument, shareOrSavePdf } from '../print/printService.js';
-import { X, Share2, Printer, FileSpreadsheet, Calendar, RefreshCw } from 'lucide-react';
+import {
+  X,
+  Share2,
+  Printer,
+  FileSpreadsheet,
+  Calendar,
+  RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2
+} from 'lucide-react';
 
 export function SOAModal({ isOpen, onClose, account, payments = [] }) {
   const [company, setCompany] = useState({});
   const [preset, setPreset] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [zoom, setZoom] = useState(1.0);
   const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
@@ -41,8 +52,14 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
       setDateTo('');
     }
 
+    setZoom(1.0);
+
     return () => { isMounted = false; };
   }, [isOpen, account, preset]);
+
+  const handleZoomIn = () => setZoom(prev => Math.min(2.0, +(prev + 0.15).toFixed(2)));
+  const handleZoomOut = () => setZoom(prev => Math.max(0.6, +(prev - 0.15).toFixed(2)));
+  const handleZoomReset = () => setZoom(1.0);
 
   // Handle Preset Changes
   const handlePresetSelect = (newPreset) => {
@@ -109,7 +126,7 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content"
-        style={{ maxWidth: 760, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: 760, maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -117,35 +134,67 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileSpreadsheet size={18} color="var(--accent-cyan)" />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Statement of Account (SOA)</h3>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0 }}>Statement of Account (SOA)</h3>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {account.name} • Account #{account.account_id}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onClose}
-            style={{ padding: '4px 8px' }}
-          >
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Zoom Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card-subtle)', borderRadius: 6, padding: '2px 4px', gap: 2 }}>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={zoom <= 0.6}
+                title="Zoom Out"
+                style={{ background: 'none', border: 'none', padding: '3px 5px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                <ZoomOut size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                title="Reset Zoom"
+                style={{ background: 'none', border: 'none', fontSize: '0.68rem', padding: '2px 4px', cursor: 'pointer', color: 'var(--text-primary)', fontWeight: 600 }}
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={zoom >= 2.0}
+                title="Zoom In"
+                style={{ background: 'none', border: 'none', padding: '3px 5px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                <ZoomIn size={13} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onClose}
+              style={{ padding: '4px 8px' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Period Filter Bar */}
         <div style={{
           background: 'var(--bg-card-subtle)',
-          padding: '10px 16px',
+          padding: '8px 14px',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 8
+          gap: 6
         }}>
           {/* Preset Buttons */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginRight: 4, textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginRight: 2, textTransform: 'uppercase' }}>
               Period:
             </span>
             <button
@@ -192,28 +241,28 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
 
           {/* Custom Date Pickers */}
           {preset === 'CUSTOM' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 2 }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
+                <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
                   From Month
                 </label>
                 <input
                   type="month"
                   className="form-input"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  style={{ padding: '5px 8px', fontSize: '0.76rem' }}
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
+                <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>
                   To Month
                 </label>
                 <input
                   type="month"
                   className="form-input"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  style={{ padding: '5px 8px', fontSize: '0.76rem' }}
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -222,29 +271,38 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
           )}
         </div>
 
-        {/* Live Preview Container */}
+        {/* Live Preview Container with Zoom */}
         <div
           className="modal-body"
           style={{
             background: '#e2e8f0',
             padding: 12,
             overflowY: 'auto',
+            overflowX: 'auto',
             flex: 1
           }}
         >
           <div
             style={{
-              background: '#ffffff',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-              borderRadius: 6,
-              overflow: 'hidden'
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease-out'
             }}
-            dangerouslySetInnerHTML={{ __html: soaHtml }}
-          />
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                borderRadius: 6,
+                overflow: 'hidden'
+              }}
+              dangerouslySetInnerHTML={{ __html: soaHtml }}
+            />
+          </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -260,10 +318,10 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
               onClick={handlePrint}
               disabled={isPrinting}
               title="Print Statement of Account"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px' }}
             >
-              <Printer size={16} />
-              <span className="hide-on-mobile">Print</span>
+              <Printer size={15} />
+              <span>Print</span>
             </button>
 
             <button
@@ -274,13 +332,13 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: '8px 18px',
-                fontSize: '0.88rem'
+                gap: 6,
+                padding: '7px 14px',
+                fontSize: '0.84rem'
               }}
             >
-              {isPrinting ? <RefreshCw size={16} className="spin" /> : <Share2 size={16} />}
-              <span>{isPrinting ? 'Generating PDF...' : 'Share / Save SOA (PDF)'}</span>
+              {isPrinting ? <RefreshCw size={15} className="spin" /> : <Share2 size={15} />}
+              <span>{isPrinting ? 'Generating...' : 'Share / Save SOA (PDF)'}</span>
             </button>
           </div>
         </div>
@@ -288,4 +346,5 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
     </div>
   );
 }
+
 export default SOAModal;

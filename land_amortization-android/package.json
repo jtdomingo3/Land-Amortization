@@ -17,6 +17,7 @@
   "author": "Gezyne-Jamir Software Tech",
   "license": "Apache-2.0",
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "date-fns": "^4.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

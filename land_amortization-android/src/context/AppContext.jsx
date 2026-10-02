@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   initDatabase,
   getAccounts,
@@ -18,6 +18,15 @@ import { computeAccountDerived, computePaymentDerived } from '../engine/calculat
 import { computeDashboard } from '../engine/dashboard.js';
 import { saveWorkbookToDevice } from '../export/excelExport.js';
 import { shareToGoogleDrive } from '../share/shareFile.js';
+import {
+  syncWithSupabase,
+  getSupabaseConfig,
+  saveSupabaseConfig,
+  syncUpsertAccount,
+  syncDeleteAccount,
+  syncUpsertPayment,
+  syncDeletePayment
+} from '../services/supabaseSync.js';
 
 const AppContext = createContext(null);
 
@@ -27,6 +36,21 @@ export function AppProvider({ children }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isCordova, setIsCordova] = useState(false);
+
+  // Cloud Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => {
+    try {
+      const cfg = getSupabaseConfig();
+      return cfg.lastSyncedAt || localStorage.getItem('land_amortization_last_synced') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isSyncingRef = useRef(false);
+  const autoSyncTimerRef = useRef(null);
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -102,6 +126,64 @@ export function AppProvider({ children }) {
     }
   }, [recompute]);
 
+  // Full Bidirectional Cloud Sync
+  const syncCloud = useCallback(async (options = {}) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    setIsSyncing(true);
+
+    if (!options.silent) {
+      setSyncStatus('Connecting to Supabase...');
+    }
+
+    try {
+      const res = await syncWithSupabase();
+      if (res && res.success) {
+        const now = res.timestamp || new Date().toISOString();
+        setLastSyncedAt(now);
+        try {
+          localStorage.setItem('land_amortization_last_synced', now);
+          saveSupabaseConfig({ lastSyncedAt: now });
+        } catch (_) {}
+
+        if (!options.silent) {
+          setSyncStatus(`Sync complete! ${res.message || ''}`);
+        }
+        // Refresh local data in case new records were pulled
+        await refreshData();
+        return res;
+      } else {
+        if (!options.silent && res?.message) {
+          setSyncStatus(`Sync notice: ${res.message}`);
+        }
+        return res;
+      }
+    } catch (err) {
+      console.warn('[Cloud Sync] Error during sync:', err);
+      if (!options.silent) {
+        setSyncStatus(`Sync error: ${err.message}`);
+      }
+      return { success: false, message: err.message };
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncing(false);
+      if (!options.silent) {
+        setTimeout(() => setSyncStatus(null), 5000);
+      }
+    }
+  }, [refreshData]);
+
+  // Debounced auto-sync trigger after database modifications
+  const triggerAutoSync = useCallback(() => {
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+    }
+    autoSyncTimerRef.current = setTimeout(() => {
+      console.log('[Cloud Sync] Auto-sync triggered after data changes...');
+      syncCloud({ silent: true });
+    }, 800);
+  }, [syncCloud]);
+
   useEffect(() => {
     const init = async () => {
       const isCordovaEnv = Boolean(window.cordova || window.sqlitePlugin);
@@ -111,6 +193,12 @@ export function AppProvider({ children }) {
         try {
           await initDatabase();
           await refreshData();
+
+          // Auto-sync upon opening (after database is loaded)
+          setTimeout(() => {
+            console.log('[Cloud Sync] Auto-sync upon app opening...');
+            syncCloud({ silent: true });
+          }, 1200);
         } catch (e) {
           console.error('Initialization error:', e);
           setError(e.message);
@@ -127,40 +215,49 @@ export function AppProvider({ children }) {
     };
 
     init();
-  }, [refreshData]);
+  }, [refreshData, syncCloud]);
 
   // CRUD Actions
   const handleAddAccount = async (accountData) => {
     await insertAccount(accountData);
+    syncUpsertAccount(accountData);
 
     // If down payment is marked as paid upfront, automatically create initial Down Payment payment record
     if (Number(accountData.is_dp_paid) === 1 && Number(accountData.down_payment) > 0) {
-      await insertPayment({
+      const dpPayment = {
         account_id: accountData.account_id,
-        payment_date: accountData.date_of_start || toISODateString(new Date()),
+        payment_date: accountData.date_of_start || new Date().toISOString().substring(0, 10),
         payment_type: 'Down Payment',
         amount_paid: Number(accountData.down_payment),
         receipt_no: `DP-${accountData.account_id}`,
         payment_method: 'Cash',
         remarks: 'Initial Down Payment'
-      });
+      };
+      await insertPayment(dpPayment);
+      syncUpsertPayment(dpPayment);
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleUpdateAccount = async (accountData) => {
     await dbUpdateAccount(accountData);
+    syncUpsertAccount(accountData);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleDeleteAccount = async (accountId) => {
     await dbDeleteAccount(accountId);
+    syncDeleteAccount(accountId);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleAddPayment = async (paymentData) => {
     await insertPayment(paymentData);
+    syncUpsertPayment(paymentData);
 
     // If payment is a Down Payment, recompute and reduce monthly amortization on the account
     if (paymentData.payment_type === 'Down Payment') {
@@ -176,25 +273,31 @@ export function AppProvider({ children }) {
         const months = Number(acc.num_of_months) || 120;
         const newMonthly = Number((Math.max(0, contract - newTotalDpPaid) / months).toFixed(2));
 
-        await dbUpdateAccount({
+        const updatedAcc = {
           ...acc,
           monthly_amortization: newMonthly,
           is_dp_paid: 1
-        });
+        };
+        await dbUpdateAccount(updatedAcc);
+        syncUpsertAccount(updatedAcc);
       }
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleUpdatePayment = async (paymentData) => {
     await dbUpdatePayment(paymentData);
+    syncUpsertPayment(paymentData);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleDeletePayment = async (paymentId) => {
     const paymentToDelete = rawPayments.find(p => p.payment_id === paymentId);
     await dbDeletePayment(paymentId);
+    syncDeletePayment(paymentId);
 
     if (paymentToDelete && paymentToDelete.payment_type === 'Down Payment') {
       const acc = rawAccounts.find(a => String(a.account_id) === String(paymentToDelete.account_id));
@@ -208,51 +311,63 @@ export function AppProvider({ children }) {
         const isPaid = remainingDpPaid >= (Number(acc.down_payment) || 0) && remainingDpPaid > 0;
         const newMonthly = Number((Math.max(0, contract - remainingDpPaid) / months).toFixed(2));
 
-        await dbUpdateAccount({
+        const updatedAcc = {
           ...acc,
           monthly_amortization: newMonthly,
           is_dp_paid: isPaid ? 1 : 0
-        });
+        };
+        await dbUpdateAccount(updatedAcc);
+        syncUpsertAccount(updatedAcc);
       }
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleExportExcel = async (customFileName) => {
     const res = await saveWorkbookToDevice(rawAccounts, rawPayments, customFileName);
-    await addExportLog({
-      export_type: 'local_save',
-      file_name: res.fileName,
-      accounts_exported: rawAccounts.length,
-      payments_exported: rawPayments.length
-    });
-    const logs = await getExportLogs();
-    setExportLogs(logs);
+    if (res && res.success && !res.canceled) {
+      const safeName = res.fileName || customFileName || `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+      await addExportLog({
+        export_type: 'local_save',
+        file_name: safeName,
+        accounts_exported: rawAccounts.length,
+        payments_exported: rawPayments.length
+      });
+      const logs = await getExportLogs();
+      setExportLogs(logs);
+    }
     return res;
   };
 
   const handleShareDrive = async (customFileName) => {
+    // Preserved Android's stable Google Drive implementation
     const res = await shareToGoogleDrive(rawAccounts, rawPayments, customFileName);
-    await addExportLog({
-      export_type: 'share_google_drive',
-      file_name: res.fileName,
-      accounts_exported: rawAccounts.length,
-      payments_exported: rawPayments.length
-    });
-    const logs = await getExportLogs();
-    setExportLogs(logs);
+    if (res && res.success && !res.canceled) {
+      const safeName = res.fileName || customFileName || `Land_Amortization_Tracker_${new Date().toISOString().substring(0, 10)}.xlsx`;
+      await addExportLog({
+        export_type: 'share_google_drive',
+        file_name: safeName,
+        accounts_exported: rawAccounts.length,
+        payments_exported: rawPayments.length
+      });
+      const logs = await getExportLogs();
+      setExportLogs(logs);
+    }
     return res;
   };
 
   const handleResetSample = async () => {
     await resetToSampleData();
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleClearAll = async () => {
     await clearAllData();
     await refreshData();
+    triggerAutoSync();
   };
 
   const value = {
@@ -271,6 +386,11 @@ export function AppProvider({ children }) {
     payments,
     dashboard,
     exportLogs,
+    isSyncing,
+    syncStatus,
+    lastSyncedAt,
+    syncCloud,
+    triggerAutoSync,
     addAccount: handleAddAccount,
     updateAccount: handleUpdateAccount,
     deleteAccount: handleDeleteAccount,

@@ -385,13 +385,30 @@ export async function insertPayment(p) {
     remarks: p.remarks || ''
   };
 
+  if (p.payment_id) {
+    payment.payment_id = Number(p.payment_id);
+  }
+
   if (isWebFallback) {
     const list = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
-    const nextId = list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1;
+    const nextId = payment.payment_id || (list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1);
     const newPayment = { ...payment, payment_id: nextId };
     list.push(newPayment);
     setWebData(WEB_STORAGE_KEYS.PAYMENTS, list);
     return newPayment;
+  }
+
+  if (payment.payment_id) {
+    const sql = `
+      INSERT INTO payments (
+        payment_id, account_id, payment_date, payment_type, amount_paid, receipt_no, payment_method, remarks
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    await runSql(sql, [
+      payment.payment_id, payment.account_id, payment.payment_date, payment.payment_type,
+      payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks
+    ]);
+    return payment;
   }
 
   const sql = `

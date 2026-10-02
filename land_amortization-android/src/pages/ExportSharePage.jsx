@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
-import { formatDate, toISODateString } from '../utils/formatters.js';
+import { formatDate, toISODateString, formatLastSync } from '../utils/formatters.js';
 import { getFileNamePresets } from '../export/excelExport.js';
 import {
   CloudUpload,
@@ -18,13 +18,14 @@ import {
   Cloud,
   Folder,
   ExternalLink,
-  Settings
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import { GoogleDriveModal } from '../components/GoogleDriveModal.jsx';
 import { getGoogleDriveConfig, openGoogleDriveFolder } from '../services/googleDriveService.js';
 import { shareToOtherApps } from '../share/shareFile.js';
 
-export function ExportSharePage() {
+export function ExportSharePage({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
   const {
     accounts,
     payments,
@@ -32,8 +33,18 @@ export function ExportSharePage() {
     exportExcel,
     shareDrive,
     resetSample,
-    clearAll
+    clearAll,
+    setActiveTab,
+    syncCloud,
+    isSyncing: appIsSyncing,
+    syncStatus: appSyncStatus,
+    lastSyncedAt: appLastSyncedAt
   } = useApp();
+
+  const currentOnSync = onSync || (() => syncCloud({ silent: false }));
+  const currentIsSyncing = isSyncing !== undefined ? isSyncing : appIsSyncing;
+  const currentSyncStatus = syncStatus !== undefined ? syncStatus : appSyncStatus;
+  const currentLastSyncedAt = lastSyncedAt !== undefined ? lastSyncedAt : appLastSyncedAt;
 
   const presets = getFileNamePresets();
   const [loadingAction, setLoadingAction] = useState(null);
@@ -145,6 +156,79 @@ export function ExportSharePage() {
             • <strong>Google Drive:</strong> Connects directly to your Google account on your phone to upload into your selected folder with 0 developer setup!
           </div>
         </div>
+      </div>
+
+      {/* Supabase Cloud Synchronization */}
+      <div className="glass-card" style={{
+        marginBottom: 16,
+        background: 'rgba(16, 185, 129, 0.05)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        padding: '14px 16px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div style={{
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            background: 'rgba(16, 185, 129, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--accent-emerald)',
+            flexShrink: 0
+          }}>
+            <Cloud size={20} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              Supabase Cloud Sync
+            </h3>
+            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+              Synchronize offline accounts & payments with Supabase to keep PC in sync.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={currentOnSync}
+              disabled={currentIsSyncing}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px' }}
+            >
+              <Cloud size={15} className={currentIsSyncing ? 'animate-spin' : ''} />
+              <span>{currentIsSyncing ? 'Syncing...' : 'Sync Cloud Now'}</span>
+            </button>
+            <span style={{ fontSize: '0.7rem', color: currentIsSyncing ? 'var(--accent-cyan)' : 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>
+              {currentIsSyncing ? 'Synchronizing...' : (currentLastSyncedAt ? `Last Synced: ${formatLastSync(currentLastSyncedAt)}` : 'Not synchronized yet')}
+            </span>
+          </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setActiveTab('settings')}
+            title="Configure Supabase URL & Key in Settings"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
+          >
+            <Settings size={14} />
+            <span>Configure Sync</span>
+          </button>
+        </div>
+
+        {currentSyncStatus && (
+          <div style={{
+            marginTop: 10,
+            padding: '8px 12px',
+            borderRadius: 6,
+            background: 'rgba(16, 185, 129, 0.12)',
+            color: 'var(--accent-emerald)',
+            fontSize: '0.76rem',
+            fontWeight: 600
+          }}>
+            {currentSyncStatus}
+          </div>
+        )}
       </div>
 
       {/* Notifications */}

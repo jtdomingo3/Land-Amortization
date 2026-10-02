@@ -8,11 +8,24 @@ import { PaymentsPage } from './pages/PaymentsPage.jsx';
 import { SchedulePage } from './pages/SchedulePage.jsx';
 import { ExportSharePage } from './pages/ExportSharePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
+import { HelpPage } from './pages/HelpPage.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
-  const { activeTab, loading, error } = useApp();
+  const {
+    activeTab,
+    loading,
+    error,
+    isSyncing,
+    syncStatus,
+    lastSyncedAt,
+    syncCloud
+  } = useApp();
+
+  const handleSyncCloud = () => {
+    return syncCloud({ silent: false });
+  };
 
   if (loading) {
     return (
@@ -46,11 +59,18 @@ export function App() {
       case 'schedule':
         return <SchedulePage />;
       case 'export':
-        return <ExportSharePage />;
+        return (
+          <ExportSharePage
+            onSync={handleSyncCloud}
+            isSyncing={isSyncing}
+            syncStatus={syncStatus}
+            lastSyncedAt={lastSyncedAt}
+          />
+        );
       case 'settings':
         return <SettingsPage />;
       case 'help':
-        return <SettingsPage defaultOpenHelp={true} />;
+        return <HelpPage />;
       default:
         return <DashboardPage />;
     }
@@ -59,7 +79,12 @@ export function App() {
   return (
     <>
       <div className="app-container">
-        <Header />
+        <Header
+          onSync={handleSyncCloud}
+          isSyncing={isSyncing}
+          syncStatus={syncStatus}
+          lastSyncedAt={lastSyncedAt}
+        />
 
         {error && (
           <div style={{
@@ -71,6 +96,23 @@ export function App() {
             textAlign: 'center'
           }}>
             Database Warning: {error}
+          </div>
+        )}
+
+        {syncStatus && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.15)',
+            borderBottom: '1px solid rgba(16, 185, 129, 0.3)',
+            color: 'var(--accent-emerald)',
+            padding: '6px 16px',
+            fontSize: '0.78rem',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8
+          }}>
+            <span>{syncStatus}</span>
           </div>
         )}
 

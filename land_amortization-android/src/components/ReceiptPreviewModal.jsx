@@ -6,12 +6,26 @@ import {
   generateSingleReceiptHTML
 } from '../print/receiptGenerator.js';
 import { printDocument, shareOrSavePdf } from '../print/printService.js';
-import { X, Share2, Printer, RefreshCw, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import {
+  X,
+  Share2,
+  Printer,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Layers
+} from 'lucide-react';
 
 export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPayments = [] }) {
   const [company, setCompany] = useState({});
   const [receiptItems, setReceiptItems] = useState([]);
   const [activeReceiptIdx, setActiveReceiptIdx] = useState(0);
+  const [viewMode, setViewMode] = useState('single'); // 'single' | 'all'
+  const [zoom, setZoom] = useState(1.0);
   const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
@@ -30,6 +44,8 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     const items = calculateReceiptCoveredMonths(account, payment, allPayments);
     setReceiptItems(items);
     setActiveReceiptIdx(0);
+    setViewMode('single');
+    setZoom(1.0);
 
     return () => { isMounted = false; };
   }, [isOpen, account, payment, allPayments]);
@@ -38,6 +54,10 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
 
   const totalReceipts = receiptItems.length;
   const currentItem = receiptItems[activeReceiptIdx] || receiptItems[0];
+
+  const handleZoomIn = () => setZoom(prev => Math.min(2.0, +(prev + 0.15).toFixed(2)));
+  const handleZoomOut = () => setZoom(prev => Math.max(0.6, +(prev - 0.15).toFixed(2)));
+  const handleZoomReset = () => setZoom(1.0);
 
   const handlePrintOrShare = async () => {
     setIsPrinting(true);
@@ -74,11 +94,15 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     totalReceipts
   }) : '';
 
+  const allReceiptsHtml = totalReceipts > 0
+    ? generateAllReceiptsHTML(account, payment, allPayments, company)
+    : '';
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content"
-        style={{ maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: 680, maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -86,85 +110,152 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileText size={18} color="var(--accent-emerald)" />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Official Receipt Preview</h3>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0 }}>Official Receipt Preview</h3>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {totalReceipts > 1
-                  ? `${totalReceipts} Receipts Generated (Covers ${totalReceipts} Months)`
+                  ? `${totalReceipts} Receipts Generated (${totalReceipts} Months Covered)`
                   : '1 Month Covered'}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onClose}
-            style={{ padding: '4px 8px' }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Multi-receipt pagination bar (if > 1 receipt) */}
-        {totalReceipts > 1 && (
-          <div style={{
-            background: 'var(--bg-card-subtle)',
-            padding: '8px 16px',
-            borderBottom: '1px solid var(--border-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-emerald-light)' }}>
-              Receipt {activeReceiptIdx + 1} of {totalReceipts}
-            </span>
-
-            <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Zoom Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card-subtle)', borderRadius: 6, padding: '2px 4px', gap: 2 }}>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setActiveReceiptIdx(prev => Math.max(0, prev - 1))}
-                disabled={activeReceiptIdx === 0}
-                style={{ padding: '4px 8px' }}
+                onClick={handleZoomOut}
+                disabled={zoom <= 0.6}
+                title="Zoom Out"
+                style={{ background: 'none', border: 'none', padding: '3px 5px', cursor: 'pointer', color: 'var(--text-secondary)' }}
               >
-                <ChevronLeft size={14} />
+                <ZoomOut size={13} />
               </button>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setActiveReceiptIdx(prev => Math.min(totalReceipts - 1, prev + 1))}
-                disabled={activeReceiptIdx === totalReceipts - 1}
-                style={{ padding: '4px 8px' }}
+                onClick={handleZoomReset}
+                title="Reset Zoom"
+                style={{ background: 'none', border: 'none', fontSize: '0.68rem', padding: '2px 4px', cursor: 'pointer', color: 'var(--text-primary)', fontWeight: 600 }}
               >
-                <ChevronRight size={14} />
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={zoom >= 2.0}
+                title="Zoom In"
+                style={{ background: 'none', border: 'none', padding: '3px 5px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                <ZoomIn size={13} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onClose}
+              style={{ padding: '4px 8px' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Multi-receipt pagination & view mode bar (if > 1 receipt) */}
+        {totalReceipts > 1 && (
+          <div style={{
+            background: 'var(--bg-card-subtle)',
+            padding: '6px 14px',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 6
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {viewMode === 'single' ? (
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-emerald)' }}>
+                  Receipt {activeReceiptIdx + 1} of {totalReceipts}
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                  Showing All {totalReceipts} Receipts
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {viewMode === 'single' && (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setActiveReceiptIdx(prev => Math.max(0, prev - 1))}
+                    disabled={activeReceiptIdx === 0}
+                    style={{ padding: '3px 7px' }}
+                    title="Previous Receipt"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setActiveReceiptIdx(prev => Math.min(totalReceipts - 1, prev + 1))}
+                    disabled={activeReceiptIdx === totalReceipts - 1}
+                    style={{ padding: '3px 7px' }}
+                    title="Next Receipt"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setViewMode(prev => prev === 'single' ? 'all' : 'single')}
+                style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <Layers size={13} />
+                <span>{viewMode === 'single' ? 'View All' : 'Single View'}</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Modal Body: Receipt Render */}
+        {/* Modal Body: Receipt Render with Zoom */}
         <div
           className="modal-body"
           style={{
             background: '#e2e8f0',
             padding: 12,
             overflowY: 'auto',
+            overflowX: 'auto',
             flex: 1
           }}
         >
           <div
             style={{
-              background: '#ffffff',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-              borderRadius: 6,
-              overflow: 'hidden'
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease-out'
             }}
-            dangerouslySetInnerHTML={{ __html: currentReceiptHtml }}
-          />
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                borderRadius: 6,
+                overflow: 'hidden'
+              }}
+              dangerouslySetInnerHTML={{ __html: viewMode === 'all' ? allReceiptsHtml : currentReceiptHtml }}
+            />
+          </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -180,10 +271,10 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               onClick={handlePrint}
               disabled={isPrinting}
               title="Print Receipt"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px' }}
             >
-              <Printer size={16} />
-              <span className="hide-on-mobile">Print</span>
+              <Printer size={15} />
+              <span>Print</span>
             </button>
 
             <button
@@ -194,13 +285,13 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: '8px 18px',
-                fontSize: '0.88rem'
+                gap: 6,
+                padding: '7px 14px',
+                fontSize: '0.84rem'
               }}
             >
-              {isPrinting ? <RefreshCw size={16} className="spin" /> : <Share2 size={16} />}
-              <span>{isPrinting ? 'Generating PDF...' : (totalReceipts > 1 ? `Share / Save ${totalReceipts} Receipts (PDF)` : 'Share / Save PDF')}</span>
+              {isPrinting ? <RefreshCw size={15} className="spin" /> : <Share2 size={15} />}
+              <span>{isPrinting ? 'Generating...' : (totalReceipts > 1 ? `Share PDF (${totalReceipts})` : 'Share / Save PDF')}</span>
             </button>
           </div>
         </div>
@@ -208,4 +299,5 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     </div>
   );
 }
+
 export default ReceiptPreviewModal;
