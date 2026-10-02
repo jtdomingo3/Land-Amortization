@@ -62,9 +62,23 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
   const handlePrintOrShare = async () => {
     setIsPrinting(true);
     try {
-      const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
-      const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
-      await shareOrSavePdf(fullHtml, title);
+      const isMultiple = viewMode === 'all' && totalReceipts > 1;
+      const htmlToGenerate = isMultiple
+        ? generateAllReceiptsHTML(account, payment, allPayments, company)
+        : (currentItem ? generateSingleReceiptHTML({
+            account,
+            payment,
+            receiptItem: currentItem,
+            company,
+            receiptIndex: activeReceiptIdx + 1,
+            totalReceipts
+          }) : generateAllReceiptsHTML(account, payment, allPayments, company));
+
+      const title = isMultiple
+        ? `${account.name || 'Account'}_Receipts_All_${payment.receipt_no || payment.payment_id}`
+        : `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}${totalReceipts > 1 ? `_part${activeReceiptIdx + 1}` : ''}`;
+
+      await shareOrSavePdf(htmlToGenerate, title);
     } catch (err) {
       alert('Could not generate PDF: ' + err.message);
     } finally {
@@ -75,9 +89,23 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
-      const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
-      const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
-      await printDocument(fullHtml, title);
+      const isMultiple = viewMode === 'all' && totalReceipts > 1;
+      const htmlToGenerate = isMultiple
+        ? generateAllReceiptsHTML(account, payment, allPayments, company)
+        : (currentItem ? generateSingleReceiptHTML({
+            account,
+            payment,
+            receiptItem: currentItem,
+            company,
+            receiptIndex: activeReceiptIdx + 1,
+            totalReceipts
+          }) : generateAllReceiptsHTML(account, payment, allPayments, company));
+
+      const title = isMultiple
+        ? `${account.name || 'Account'}_Receipts_All_${payment.receipt_no || payment.payment_id}`
+        : `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}${totalReceipts > 1 ? `_part${activeReceiptIdx + 1}` : ''}`;
+
+      await printDocument(htmlToGenerate, title);
     } catch (err) {
       alert('Could not print: ' + err.message);
     } finally {
@@ -274,7 +302,7 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px' }}
             >
               <Printer size={15} />
-              <span>Print</span>
+              <span>{viewMode === 'all' && totalReceipts > 1 ? `Print All (${totalReceipts})` : 'Print'}</span>
             </button>
 
             <button
@@ -291,7 +319,13 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               }}
             >
               {isPrinting ? <RefreshCw size={15} className="spin" /> : <Share2 size={15} />}
-              <span>{isPrinting ? 'Generating...' : (totalReceipts > 1 ? `Share PDF (${totalReceipts})` : 'Share / Save PDF')}</span>
+              <span>
+                {isPrinting
+                  ? 'Generating...'
+                  : (viewMode === 'all' && totalReceipts > 1
+                      ? `Share All PDFs (${totalReceipts})`
+                      : (totalReceipts > 1 ? `Share PDF (${activeReceiptIdx + 1}/${totalReceipts})` : 'Share / Save PDF'))}
+              </span>
             </button>
           </div>
         </div>

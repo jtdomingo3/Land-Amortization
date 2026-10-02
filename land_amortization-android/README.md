@@ -122,32 +122,88 @@ npm run build
 
 ---
 
-## Compiling the Android APK
+---
 
-1. **Ensure Cordova Android platform is prepared**:
+## Compiling the Android APK Installer
 
-   ```bash
-   npm run build
-   npx cordova prepare android
-   ```
-2. **Build Debug APK**:
+### Quick Build (One-Command)
 
-   ```bash
-   npx cordova build android
-   ```
+In the `land_amortization-android` directory, run:
 
-   The compiled APK will be located at:
+```powershell
+npm run build:apk
+```
 
-   ```text
-   platforms/android/app/build/outputs/apk/debug/app-debug.apk
-   ```
-3. **Install & Run on a Connected Android Device or Emulator**:
+Or run the build script directly:
+- **PowerShell**: `.\build_apk.ps1`
+- **Command Prompt (CMD)**: `build_apk.bat`
 
-   ```bash
-   npx cordova run android
-   ```
+This automated script will:
+1. Compile the React web application bundle with Vite (`npm run build`).
+2. Synchronize web assets and plugins to the Android platform (`npx cordova prepare android`).
+3. Compile the debug APK using Gradle 7.6 with JDK 17.
+4. Copy the ready-to-install APK to the root directory as **`LandAmortization-v1.0.0.apk`**.
 
 ---
+
+### Manual Compilation Steps
+
+If you prefer to run each step manually:
+
+#### 1. Build Web Bundle & Sync Cordova Platform
+```powershell
+npm run build
+npx cordova prepare android
+```
+
+#### 2. Configure Environment (Windows PowerShell)
+> [!IMPORTANT]
+> Cordova Android 12 requires **JDK 17** (Gradle 7.6 is not compatible with JDK 21+).
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:Path = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:Path"
+```
+
+#### 3. Compile the APK with Gradle
+```powershell
+.\platforms\android\gradlew.bat -b .\platforms\android\build.gradle cdvBuildDebug
+```
+
+#### 4. Copy to Root Installer
+```powershell
+Copy-Item -Path ".\platforms\android\app\build\outputs\apk\debug\app-debug.apk" -Destination ".\LandAmortization-v1.0.0.apk" -Force
+```
+
+---
+
+### Output APK File
+
+The ready-to-install APK is located at:
+- **Root Directory**: `land_amortization-android/LandAmortization-v1.0.0.apk`
+- **Gradle Build Output**: `land_amortization-android/platforms/android/app/build/outputs/apk/debug/app-debug.apk`
+
+---
+
+### Installing on Device
+
+Connect your Android phone via USB (with **USB Debugging** enabled) or transfer `LandAmortization-v1.0.0.apk` via USB / Drive:
+
+```bash
+# Via ADB:
+adb install -r LandAmortization-v1.0.0.apk
+```
+
+Or tap the `.apk` file directly in your Android file manager to install.
+
+---
+
+### Network & Security Configuration
+
+- **Content Security Policy (CSP)**: `index.html` permits HTTPS REST calls and WebSocket (`wss:`) connections to `https://*.supabase.co` for live 2-way cloud synchronization.
+- **Supabase Credentials**: Project URL and Key are masked and dynamically reconstituted at runtime to defeat binary string extraction and reverse engineering.
+- **File System Permissions**: `WRITE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE`, and `requestLegacyExternalStorage="true"` are enabled in `AndroidManifest.xml` to allow `.xlsx` workbook generation to external phone storage.
 
 ## Privacy & Security
 

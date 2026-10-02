@@ -110,17 +110,30 @@ npm install
 # 2. Run Vite dev server for browser preview
 npm run dev
 
-# 3. Build web assets & prepare Cordova platform
+# 3. One-Command Build for Android APK Installer
+npm run build:apk
+# (or run .\build_apk.ps1 in PowerShell / build_apk.bat in CMD)
+```
+
+#### Manual Compilation Steps (PowerShell):
+```powershell
+# Build web bundle & prepare platform
 npm run build
 npx cordova prepare android
 
-# 4. Compile Android Debug APK
-cd platforms/android
-gradle assembleDebug
+# Compile with Gradle 7.6 + JDK 17
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:Path = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:Path"
+.\platforms\android\gradlew.bat -b .\platforms\android\build.gradle cdvBuildDebug
+
+# Copy installer to root directory
+Copy-Item -Path ".\platforms\android\app\build\outputs\apk\debug\app-debug.apk" -Destination ".\LandAmortization-v1.0.0.apk" -Force
 ```
 
-Compiled APK output path:
-`land_amortization-android/platforms/android/app/build/outputs/apk/debug/app-debug.apk`
+Compiled APK installer output path:
+- Root Installer: `land_amortization-android/LandAmortization-v1.0.0.apk`
+- Gradle Output: `land_amortization-android/platforms/android/app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 

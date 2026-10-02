@@ -148,18 +148,22 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     setIsProcessing(true);
     setStatusMessage(null);
     try {
-      const fullHtml = viewMode === 'all' || totalReceipts === 1
+      const isMultiple = viewMode === 'all' && totalReceipts > 1;
+      const fullHtml = isMultiple
         ? generateAllReceiptsHTML(account, payment, allPayments, company)
-        : generateSingleReceiptHTML({
+        : (currentItem ? generateSingleReceiptHTML({
             account,
             payment,
             receiptItem: currentItem,
             company,
             receiptIndex: activeReceiptIdx + 1,
             totalReceipts
-          });
+          }) : generateAllReceiptsHTML(account, payment, allPayments, company));
 
-      const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
+      const title = isMultiple
+        ? `${account.name || 'Account'}_Receipts_All_${payment.receipt_no || payment.payment_id}`
+        : `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}${totalReceipts > 1 ? `_part${activeReceiptIdx + 1}` : ''}`;
+
       const res = await printDocument(fullHtml, title, {
         silent: true,
         deviceName: selectedPrinter,
@@ -189,8 +193,22 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     setIsProcessing(true);
     setStatusMessage(null);
     try {
-      const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
-      const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
+      const isMultiple = viewMode === 'all' && totalReceipts > 1;
+      const fullHtml = isMultiple
+        ? generateAllReceiptsHTML(account, payment, allPayments, company)
+        : (currentItem ? generateSingleReceiptHTML({
+            account,
+            payment,
+            receiptItem: currentItem,
+            company,
+            receiptIndex: activeReceiptIdx + 1,
+            totalReceipts
+          }) : generateAllReceiptsHTML(account, payment, allPayments, company));
+
+      const title = isMultiple
+        ? `${account.name || 'Account'}_Receipts_All_${payment.receipt_no || payment.payment_id}`
+        : `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}${totalReceipts > 1 ? `_part${activeReceiptIdx + 1}` : ''}`;
+
       const res = await saveDocumentAsPdf(fullHtml, title, {
         pageSize: paperSize,
         landscape: orientation === 'landscape'
@@ -407,7 +425,7 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px' }}
             >
               <Download size={15} color="var(--accent-cyan)" />
-              <span>Save as PDF</span>
+              <span>{viewMode === 'all' && totalReceipts > 1 ? `Save All (${totalReceipts})` : (totalReceipts > 1 ? `Save PDF (${activeReceiptIdx + 1}/${totalReceipts})` : 'Save as PDF')}</span>
             </button>
 
             <button
@@ -419,7 +437,7 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', fontWeight: 700 }}
             >
               {isProcessing ? <RefreshCw size={15} className="spin" /> : <Printer size={15} />}
-              <span>Print Receipt</span>
+              <span>{viewMode === 'all' && totalReceipts > 1 ? `Print All (${totalReceipts})` : 'Print Receipt'}</span>
             </button>
 
             <button
