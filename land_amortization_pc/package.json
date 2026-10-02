@@ -2,7 +2,7 @@
   "name": "land-amortization-tracker",
   "productName": "Land Amortization Tracker",
   "description": "Land Amortization Tracker & Contract Management PC Application",
-  "author": "Land Amortization Team",
+  "author": "Gezyne-Jamir Software Tech",
   "private": true,
   "version": "1.0.0",
   "main": "dist-electron/main.js",
@@ -18,7 +18,7 @@
   "build": {
     "appId": "com.landamortization.tracker",
     "productName": "Land Amortization Tracker",
-    "copyright": "Copyright © 2026",
+    "copyright": "Copyright © 2026 Gezyne-Jamir Software Tech",
     "directories": {
       "output": "release"
     },
@@ -49,7 +49,8 @@
       "shortcutName": "Land Amortization Tracker",
       "installerIcon": "public/icon.ico",
       "uninstallerIcon": "public/icon.ico",
-      "uninstallDisplayName": "Land Amortization Tracker"
+      "uninstallDisplayName": "Land Amortization Tracker",
+      "license": "build/terms.txt"
     }
   },
   "dependencies": {
