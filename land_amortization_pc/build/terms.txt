@@ -1,0 +1,96 @@
+================================================================================
+          LAND AMORTIZATION TRACKER — END USER LICENSE & TERMS OF AGREEMENT
+                      Developed by: Gezyne-Jamir Software Tech
+================================================================================
+
+PLEASE READ THIS END USER LICENSE AND TERMS OF AGREEMENT ("AGREEMENT") CAREFULLY 
+BEFORE INSTALLING OR USING THE LAND AMORTIZATION TRACKER SOFTWARE ("SOFTWARE").
+
+THIS SOFTWARE IS DEVELOPED, OWNED, AND PUBLISHED BY GEZYNE-JAMIR SOFTWARE TECH.
+
+BY CLICKING "I AGREE", DOWNLOADING, INSTALLING, OR USING THIS SOFTWARE, YOU 
+AGREE TO BE BOUND BY THE TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO 
+NOT AGREE, DO NOT INSTALL OR USE THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+1. AUTHOR & DEVELOPER RECOGNITION
+--------------------------------------------------------------------------------
+Land Amortization Tracker is engineered, designed, and developed by:
+Gezyne-Jamir Software Tech ("Author", "Developer", "Licensor"). 
+
+All intellectual property rights, system architecture, database models, 
+proprietary calculation engines, user interface design, and software source code 
+are the property of Gezyne-Jamir Software Tech.
+
+--------------------------------------------------------------------------------
+2. LICENSE GRANT & PERMITTED USE
+--------------------------------------------------------------------------------
+Gezyne-Jamir Software Tech grants you a revocable, non-exclusive, non-transferable 
+license to install, execute, and use the Software on your personal or business 
+computer solely for the purpose of managing land amortization accounts, tracking 
+installment payment ledgers, generating Statements of Account (SOA), issuing 
+official receipts, and maintaining business records.
+
+--------------------------------------------------------------------------------
+3. DATA OWNERSHIP & LOCAL PRIVACY
+--------------------------------------------------------------------------------
+3.1 All business records, buyer details, payment entries, transaction history, 
+and reports entered or created using this Software remain your exclusive property. 
+Gezyne-Jamir Software Tech claims no ownership over your client data.
+
+3.2 The Software operates primarily offline using a local SQLite database stored 
+securely on your computer.
+
+3.3 Cloud synchronization features (including Supabase Cloud Database and Google 
+Drive export) are optional services designed to synchronize records across your 
+devices. Your access keys and credentials are saved locally on your workstation.
+
+--------------------------------------------------------------------------------
+4. FINANCIAL CALCULATIONS & VERIFICATION DISCLAIMER
+--------------------------------------------------------------------------------
+4.1 The Software provides automated computation tools (including monthly 
+amortization waterfalls, down payment adjustments, interest, and penalty tracking) 
+as an administrative and bookkeeping aid.
+
+4.2 While Gezyne-Jamir Software Tech has implemented rigorous numerical accuracy 
+and real estate accounting standards, users are advised to verify generated 
+schedules, Statements of Account, and receipts against official contracts and 
+applicable legal regulations.
+
+--------------------------------------------------------------------------------
+5. BACKUP & SYSTEM MAINTENANCE
+--------------------------------------------------------------------------------
+Users are strongly advised to perform regular backups using the built-in 
+"Export to Excel" and "Cloud Sync" tools. Gezyne-Jamir Software Tech shall not 
+be liable for data loss caused by hardware malfunction, OS failures, malware, 
+or accidental deletion.
+
+--------------------------------------------------------------------------------
+6. RESTRICTIONS
+--------------------------------------------------------------------------------
+You agree that you will not:
+(a) Reverse engineer, decompile, or disassemble the binary packages;
+(b) Rent, lease, sublicense, or distribute unauthorized commercial copies;
+(c) Remove or alter any proprietary notices, author credits, or logos of 
+    Gezyne-Jamir Software Tech contained in the Software.
+
+--------------------------------------------------------------------------------
+7. DISCLAIMER OF WARRANTIES
+--------------------------------------------------------------------------------
+THE SOFTWARE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT 
+WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
+TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND 
+NON-INFRINGEMENT.
+
+--------------------------------------------------------------------------------
+8. LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL GEZYNE-JAMIR SOFTWARE 
+TECH, ITS DEVELOPERS, OR AFFILIATES BE LIABLE FOR ANY DIRECT, INDIRECT, 
+INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES (INCLUDING LOSS OF PROFITS, DATA, 
+OR BUSINESS INTERRUPTION) ARISING OUT OF THE USE OR INABILITY TO USE THIS SOFTWARE.
+
+================================================================================
+By clicking "I Agree" below, you confirm that you have read, understood, and 
+accepted all the terms and conditions outlined in this Agreement.
+================================================================================

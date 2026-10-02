@@ -56,6 +56,8 @@ advancedFeatures.ini
 .gradle/
 build/
 */build/
+!land_amortization_pc/build/
+!land_amortization_pc/build/**
 platforms/android/app/build/
 local.properties
 .externalNativeBuild/
