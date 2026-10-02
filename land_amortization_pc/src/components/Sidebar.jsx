@@ -112,7 +112,10 @@ export function Sidebar({ onNewAccount, onNewPayment }) {
           </div>
         </div>
         <div className="sidebar-version-tag">
-          Land Amortization Desktop v1.0
+          <div>Land Amortization Desktop v1.0</div>
+          <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            by Gezyne-Jamir Software Tech
+          </div>
         </div>
       </div>
     </aside>
