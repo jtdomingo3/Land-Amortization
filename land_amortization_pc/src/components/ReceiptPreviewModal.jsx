@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getCompanySettings } from '../print/companyConfig.js';
 import {
   calculateReceiptCoveredMonths,
   generateAllReceiptsHTML,
   generateSingleReceiptHTML
 } from '../print/receiptGenerator.js';
-import { printDocument, saveDocumentAsPdf } from '../print/printService.js';
+import { printDocument, saveDocumentAsPdf, getSystemPrinters } from '../print/printService.js';
+import { PrintControlBar } from './PrintControlBar.jsx';
 import {
   X,
   Printer,
@@ -31,6 +32,39 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'error', text: '' }
 
+  // In-app Print Settings State (Persisted in localStorage)
+  const [printers, setPrinters] = useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(() => localStorage.getItem('land_amort_receipt_printer') || '');
+  const [paperSize, setPaperSize] = useState(() => localStorage.getItem('land_amort_receipt_paper') || 'A4');
+  const [orientation, setOrientation] = useState(() => localStorage.getItem('land_amort_receipt_orientation') || 'portrait');
+  const [marginType, setMarginType] = useState(() => localStorage.getItem('land_amort_receipt_margin') || 'default');
+  const [copies, setCopies] = useState(() => Number(localStorage.getItem('land_amort_receipt_copies')) || 1);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+
+  // Fetch connected system printers
+  const fetchPrinters = useCallback(async () => {
+    setIsLoadingPrinters(true);
+    try {
+      const list = await getSystemPrinters();
+      setPrinters(list);
+
+      // If user hasn't explicitly set a printer, prefer thermal printer (e.g. Xprinter) or default
+      if (!localStorage.getItem('land_amort_receipt_printer') && list.length > 0) {
+        const thermal = list.find(p => p.name.toLowerCase().includes('xprinter') || p.name.toLowerCase().includes('pos') || p.name.toLowerCase().includes('receipt'));
+        const defaultPrinter = list.find(p => p.isDefault);
+        if (thermal) {
+          setSelectedPrinter(thermal.name);
+        } else if (defaultPrinter) {
+          setSelectedPrinter(defaultPrinter.name);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading printers:', e);
+    } finally {
+      setIsLoadingPrinters(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen || !account || !payment) return;
 
@@ -44,6 +78,7 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
       }
     })();
 
+    fetchPrinters();
     const items = calculateReceiptCoveredMonths(account, payment, allPayments);
     setReceiptItems(items);
     setActiveReceiptIdx(0);
@@ -52,7 +87,53 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     setStatusMessage(null);
 
     return () => { isMounted = false; };
-  }, [isOpen, account, payment, allPayments]);
+  }, [isOpen, account, payment, allPayments, fetchPrinters]);
+
+  // Settings Handlers with Persistence
+  const handleSelectPrinter = (name) => {
+    setSelectedPrinter(name);
+    localStorage.setItem('land_amort_receipt_printer', name);
+  };
+
+  const handleSelectPaperSize = (size) => {
+    setPaperSize(size);
+    localStorage.setItem('land_amort_receipt_paper', size);
+  };
+
+  const handleSelectOrientation = (orient) => {
+    setOrientation(orient);
+    localStorage.setItem('land_amort_receipt_orientation', orient);
+  };
+
+  const handleSelectMarginType = (margin) => {
+    setMarginType(margin);
+    localStorage.setItem('land_amort_receipt_margin', margin);
+  };
+
+  const handleSelectCopies = (count) => {
+    setCopies(count);
+    localStorage.setItem('land_amort_receipt_copies', String(count));
+  };
+
+  // Dynamic preview sheet width based on paper & orientation
+  const sheetWidth = useMemo(() => {
+    if (paperSize === 'Roll80') return 360;
+    if (paperSize === 'Roll58') return 260;
+    if (orientation === 'landscape') {
+      if (paperSize === 'Letter') return 1056;
+      if (paperSize === 'Legal') return 1344;
+      return 1122;
+    }
+    if (paperSize === 'Letter' || paperSize === 'Legal') return 816;
+    return 740; // A4 standard
+  }, [paperSize, orientation]);
+
+  const sheetPadding = useMemo(() => {
+    if (marginType === 'none') return '0px';
+    if (marginType === 'narrow') return '8px';
+    if (marginType === 'wide') return '24px';
+    return '14px';
+  }, [marginType]);
 
   if (!isOpen || !account || !payment) return null;
 
@@ -79,12 +160,23 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
           });
 
       const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
-      const res = await printDocument(fullHtml, title);
+      const res = await printDocument(fullHtml, title, {
+        silent: true,
+        deviceName: selectedPrinter,
+        pageSize: paperSize,
+        landscape: orientation === 'landscape',
+        marginType,
+        copies
+      });
       if (res && res.error) {
         setStatusMessage({ type: 'error', text: `Print failed: ${res.error}` });
       } else {
-        setStatusMessage({ type: 'success', text: 'Document sent to printer successfully.' });
-        setTimeout(() => setStatusMessage(null), 4000);
+        const dest = selectedPrinter || 'Default System Printer';
+        setStatusMessage({
+          type: 'success',
+          text: `Receipt sent directly to ${dest} (${copies} copy${copies > 1 ? 'ies' : ''}, ${paperSize} ${orientation === 'landscape' ? 'Landscape' : 'Portrait'}).`
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
       }
     } catch (err) {
       setStatusMessage({ type: 'error', text: `Print error: ${err.message}` });
@@ -99,7 +191,10 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
     try {
       const fullHtml = generateAllReceiptsHTML(account, payment, allPayments, company);
       const title = `${account.name || 'Account'}_Receipt_${payment.receipt_no || payment.payment_id}`;
-      const res = await saveDocumentAsPdf(fullHtml, title);
+      const res = await saveDocumentAsPdf(fullHtml, title, {
+        pageSize: paperSize,
+        landscape: orientation === 'landscape'
+      });
       if (res && res.success) {
         setStatusMessage({ type: 'success', text: res.message || 'PDF saved successfully.' });
         setTimeout(() => setStatusMessage(null), 4000);
@@ -339,6 +434,24 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
           </div>
         </div>
 
+        {/* In-App Direct Print Settings Bar */}
+        <PrintControlBar
+          printers={printers}
+          selectedPrinter={selectedPrinter}
+          onSelectPrinter={handleSelectPrinter}
+          paperSize={paperSize}
+          onSelectPaperSize={handleSelectPaperSize}
+          orientation={orientation}
+          onSelectOrientation={handleSelectOrientation}
+          marginType={marginType}
+          onSelectMarginType={handleSelectMarginType}
+          copies={copies}
+          onSelectCopies={handleSelectCopies}
+          onRefreshPrinters={fetchPrinters}
+          isLoadingPrinters={isLoadingPrinters}
+          documentType="receipt"
+        />
+
         {/* Status Toast Banner */}
         {statusMessage && (
           <div style={{
@@ -383,10 +496,11 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
           <div
             className="print-preview-sheet"
             style={{
-              width: 720,
+              width: sheetWidth,
+              padding: sheetPadding,
               transform: `scale(${zoom})`,
               transformOrigin: 'top center',
-              transition: 'transform 0.15s ease-out',
+              transition: 'transform 0.15s ease-out, width 0.2s ease-out, padding 0.2s ease-out',
               background: '#ffffff',
               borderRadius: 6,
               boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25)',
@@ -411,11 +525,10 @@ export function ReceiptPreviewModal({ isOpen, onClose, account, payment, allPaym
           }}
         >
           <div>
-            Showing: <strong>{viewMode === 'all' ? `All ${totalReceipts} Receipts` : `Receipt ${activeReceiptIdx + 1} of ${totalReceipts}`}</strong>
-            {currentItem && currentItem.periodText && ` &bull; Period: ${currentItem.periodText}`}
+            Target Printer: <strong>{selectedPrinter || 'System Default'}</strong> &bull; Paper: <strong>{paperSize} {orientation === 'landscape' ? 'Landscape' : 'Portrait'}</strong> &bull; Margin: <strong>{marginType}</strong> &bull; Copies: <strong>{copies}</strong>
           </div>
           <div>
-            Format: Standard Receipt Slip &bull; Zoom: {Math.round(zoom * 100)}%
+            Showing: <strong>{viewMode === 'all' ? `All ${totalReceipts} Receipts` : `Receipt ${activeReceiptIdx + 1} of ${totalReceipts}`}</strong> &bull; Zoom: {Math.round(zoom * 100)}%
           </div>
         </div>
       </div>

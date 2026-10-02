@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getCompanySettings } from '../print/companyConfig.js';
 import { generateSOAHTML } from '../print/soaGenerator.js';
-import { printDocument, saveDocumentAsPdf } from '../print/printService.js';
+import { printDocument, saveDocumentAsPdf, getSystemPrinters } from '../print/printService.js';
+import { PrintControlBar } from './PrintControlBar.jsx';
 import {
   X,
   Printer,
@@ -25,6 +26,35 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
 
+  // In-app Print Settings State (Persisted in localStorage)
+  const [printers, setPrinters] = useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(() => localStorage.getItem('land_amort_soa_printer') || '');
+  const [paperSize, setPaperSize] = useState(() => localStorage.getItem('land_amort_soa_paper') || 'A4');
+  const [orientation, setOrientation] = useState(() => localStorage.getItem('land_amort_soa_orientation') || 'portrait');
+  const [marginType, setMarginType] = useState(() => localStorage.getItem('land_amort_soa_margin') || 'default');
+  const [copies, setCopies] = useState(() => Number(localStorage.getItem('land_amort_soa_copies')) || 1);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+
+  // Fetch connected system printers
+  const fetchPrinters = useCallback(async () => {
+    setIsLoadingPrinters(true);
+    try {
+      const list = await getSystemPrinters();
+      setPrinters(list);
+      // If user hasn't explicitly chosen a printer, match system default
+      if (!localStorage.getItem('land_amort_soa_printer') && list.length > 0) {
+        const defaultPrinter = list.find(p => p.isDefault);
+        if (defaultPrinter) {
+          setSelectedPrinter(defaultPrinter.name);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading printers:', e);
+    } finally {
+      setIsLoadingPrinters(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen || !account) return;
 
@@ -38,11 +68,59 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
       }
     })();
 
+    fetchPrinters();
     setZoom(1.0);
     setStatusMessage(null);
 
     return () => { isMounted = false; };
-  }, [isOpen, account]);
+  }, [isOpen, account, fetchPrinters]);
+
+  // Settings Handlers with Persistence
+  const handleSelectPrinter = (name) => {
+    setSelectedPrinter(name);
+    localStorage.setItem('land_amort_soa_printer', name);
+  };
+
+  const handleSelectPaperSize = (size) => {
+    setPaperSize(size);
+    localStorage.setItem('land_amort_soa_paper', size);
+  };
+
+  const handleSelectOrientation = (orient) => {
+    setOrientation(orient);
+    localStorage.setItem('land_amort_soa_orientation', orient);
+  };
+
+  const handleSelectMarginType = (margin) => {
+    setMarginType(margin);
+    localStorage.setItem('land_amort_soa_margin', margin);
+  };
+
+  const handleSelectCopies = (count) => {
+    setCopies(count);
+    localStorage.setItem('land_amort_soa_copies', String(count));
+  };
+
+  // Dynamic preview sheet width based on paper & orientation
+  const sheetWidth = useMemo(() => {
+    if (orientation === 'landscape') {
+      if (paperSize === 'Letter') return 1056;
+      if (paperSize === 'Legal') return 1344;
+      return 1122; // A4 Landscape
+    }
+    if (paperSize === 'Letter') return 816;
+    if (paperSize === 'Legal') return 816;
+    if (paperSize === 'Roll80') return 340;
+    if (paperSize === 'Roll58') return 240;
+    return 794; // A4 Portrait at 96 DPI
+  }, [paperSize, orientation]);
+
+  const sheetPadding = useMemo(() => {
+    if (marginType === 'none') return '0px';
+    if (marginType === 'narrow') return '10px';
+    if (marginType === 'wide') return '28px';
+    return '18px';
+  }, [marginType]);
 
   // Handle Preset Changes
   const handlePresetSelect = (newPreset) => {
@@ -90,12 +168,23 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
     setIsProcessing(true);
     setStatusMessage(null);
     try {
-      const res = await printDocument(soaHtml, docTitle);
+      const res = await printDocument(soaHtml, docTitle, {
+        silent: true,
+        deviceName: selectedPrinter,
+        pageSize: paperSize,
+        landscape: orientation === 'landscape',
+        marginType,
+        copies
+      });
       if (res && res.error) {
         setStatusMessage({ type: 'error', text: `Print failed: ${res.error}` });
       } else {
-        setStatusMessage({ type: 'success', text: 'Statement of Account sent to printer.' });
-        setTimeout(() => setStatusMessage(null), 4000);
+        const dest = selectedPrinter || 'Default System Printer';
+        setStatusMessage({
+          type: 'success',
+          text: `Document sent directly to ${dest} (${copies} copy${copies > 1 ? 'ies' : ''}, ${paperSize} ${orientation === 'landscape' ? 'Landscape' : 'Portrait'}).`
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
       }
     } catch (err) {
       setStatusMessage({ type: 'error', text: `Print error: ${err.message}` });
@@ -108,7 +197,10 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
     setIsProcessing(true);
     setStatusMessage(null);
     try {
-      const res = await saveDocumentAsPdf(soaHtml, docTitle);
+      const res = await saveDocumentAsPdf(soaHtml, docTitle, {
+        pageSize: paperSize,
+        landscape: orientation === 'landscape'
+      });
       if (res && res.success) {
         setStatusMessage({ type: 'success', text: res.message || 'SOA saved as PDF successfully.' });
         setTimeout(() => setStatusMessage(null), 4000);
@@ -274,6 +366,24 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
           </div>
         </div>
 
+        {/* In-App Direct Print Settings Bar */}
+        <PrintControlBar
+          printers={printers}
+          selectedPrinter={selectedPrinter}
+          onSelectPrinter={handleSelectPrinter}
+          paperSize={paperSize}
+          onSelectPaperSize={handleSelectPaperSize}
+          orientation={orientation}
+          onSelectOrientation={handleSelectOrientation}
+          marginType={marginType}
+          onSelectMarginType={handleSelectMarginType}
+          copies={copies}
+          onSelectCopies={handleSelectCopies}
+          onRefreshPrinters={fetchPrinters}
+          isLoadingPrinters={isLoadingPrinters}
+          documentType="soa"
+        />
+
         {/* Filter Toolbar: Schedule Period Options */}
         <div style={{
           background: 'var(--bg-card)',
@@ -399,10 +509,11 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
           <div
             className="print-preview-sheet"
             style={{
-              width: 794, // Standard A4 width at 96 DPI
+              width: sheetWidth,
+              padding: sheetPadding,
               transform: `scale(${zoom})`,
               transformOrigin: 'top center',
-              transition: 'transform 0.15s ease-out',
+              transition: 'transform 0.15s ease-out, width 0.2s ease-out, padding 0.2s ease-out',
               background: '#ffffff',
               borderRadius: 6,
               boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25)',
@@ -427,10 +538,10 @@ export function SOAModal({ isOpen, onClose, account, payments = [] }) {
           }}
         >
           <div>
-            Schedule: <strong>{preset === 'ALL' ? 'Complete Amortization Term' : (preset === 'YTD' ? 'Year-to-Date' : (preset === 'THIS_YEAR' ? 'Full Current Year' : 'Filtered Period'))}</strong> &bull; Total Payments Logged: {payments.length}
+            Target Printer: <strong>{selectedPrinter || 'System Default'}</strong> &bull; Paper: <strong>{paperSize} {orientation === 'landscape' ? 'Landscape' : 'Portrait'}</strong> &bull; Margin: <strong>{marginType}</strong> &bull; Copies: <strong>{copies}</strong>
           </div>
           <div>
-            Format: Standard A4 Formal Statement &bull; Zoom: {Math.round(zoom * 100)}%
+            Schedule: <strong>{preset === 'ALL' ? 'Complete Amortization Term' : (preset === 'YTD' ? 'Year-to-Date' : (preset === 'THIS_YEAR' ? 'Full Current Year' : 'Filtered Period'))}</strong> &bull; Zoom: {Math.round(zoom * 100)}%
           </div>
         </div>
       </div>

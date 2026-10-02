@@ -100,21 +100,44 @@ export async function generatePdfBlobFromHtml(htmlContent, documentTitle = 'Docu
 }
 
 /**
+ * Retrieve list of connected system printers from Windows via Electron.
+ * Returns array of { name, displayName, description, status, isDefault } objects.
+ */
+export async function getSystemPrinters() {
+  if (typeof window !== 'undefined' && window.electronAPI?.print?.getPrinters) {
+    try {
+      const printers = await window.electronAPI.print.getPrinters();
+      return Array.isArray(printers) ? printers : [];
+    } catch (err) {
+      console.warn('[PrintService] Error fetching system printers:', err);
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
  * Direct print document to printer.
- * On Electron PC: uses native print:html (silent: false) which opens the Windows OS
- * printer selection dialog directly without Chromium's broken print preview.
+ * On Electron PC: uses native print:html (silent: true) which sends directly to the
+ * selected printer device (or default printer) without native Windows dialog popups.
  */
 export async function printDocument(htmlContent, documentTitle = 'Document', options = {}) {
-  // 1. Electron Desktop Native Print
+  // 1. Electron Desktop Native Silent Print
   if (typeof window !== 'undefined' && window.electronAPI?.print?.printHtml) {
     try {
       const res = await window.electronAPI.print.printHtml(htmlContent, {
         title: documentTitle,
-        silent: options.silent || false
+        silent: options.silent !== undefined ? options.silent : true,
+        deviceName: options.deviceName || '',
+        pageSize: options.pageSize || 'A4',
+        landscape: Boolean(options.landscape),
+        marginType: options.marginType || 'default',
+        copies: Number(options.copies) || 1
       });
       return res;
     } catch (err) {
       console.error('[PrintService] Electron native print error:', err);
+      return { success: false, error: err.message };
     }
   }
 
@@ -178,7 +201,7 @@ export async function printDocument(htmlContent, documentTitle = 'Document', opt
  * On Electron: uses vector-sharp printToPDF and native Windows save dialog.
  * On Browser: uses jsPDF + html2canvas and browser downloads.
  */
-export async function saveDocumentAsPdf(htmlContent, documentTitle = 'Document') {
+export async function saveDocumentAsPdf(htmlContent, documentTitle = 'Document', options = {}) {
   const sanitizedTitle = (documentTitle || 'Document').replace(/[^a-zA-Z0-9_-]/g, '_');
 
   // 1. Electron Native PDF Export
@@ -186,7 +209,9 @@ export async function saveDocumentAsPdf(htmlContent, documentTitle = 'Document')
     try {
       const res = await window.electronAPI.print.toPdf(htmlContent, {
         title: sanitizedTitle,
-        dialogTitle: `Save ${documentTitle} as PDF`
+        dialogTitle: `Save ${documentTitle} as PDF`,
+        pageSize: options.pageSize || 'A4',
+        landscape: Boolean(options.landscape)
       });
       if (res.canceled) {
         return { success: false, canceled: true, message: 'Export canceled by user.' };

@@ -262,7 +262,21 @@ function setupIpcHandlers() {
     return false;
   });
 
-  // Desktop Native Print (Bypasses broken Chromium print preview, invokes system print dialog)
+  // Get available printers from Windows OS
+  ipcMain.handle('print:getPrinters', async () => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const printers = await mainWindow.webContents.getPrintersAsync();
+        return printers || [];
+      }
+      return [];
+    } catch (err) {
+      console.error('[Print] getPrintersAsync error:', err);
+      return [];
+    }
+  });
+
+  // Desktop Native Print (Direct silent print to selected printer without native Windows print dialog)
   ipcMain.handle('print:html', async (_event, htmlContent, options = {}) => {
     return new Promise((resolve) => {
       let printWin = null;
@@ -275,6 +289,33 @@ function setupIpcHandlers() {
           }
         });
 
+        // Determine page size and orientation CSS
+        const rawPageSize = options.pageSize || 'A4';
+        const isLandscape = Boolean(options.landscape);
+        const orientationCss = isLandscape ? 'landscape' : 'portrait';
+
+        let sizeCss = 'A4';
+        if (rawPageSize === 'Roll80' || rawPageSize === '80mm') {
+          sizeCss = '80mm auto';
+        } else if (rawPageSize === 'Roll58' || rawPageSize === '58mm') {
+          sizeCss = '58mm auto';
+        } else if (['Letter', 'Legal', 'A3', 'A4', 'A5'].includes(rawPageSize)) {
+          sizeCss = rawPageSize;
+        }
+
+        // Determine margin CSS
+        let marginCss = '10mm';
+        const marginType = options.marginType || 'default';
+        if (marginType === 'none') {
+          marginCss = '0mm';
+        } else if (marginType === 'narrow') {
+          marginCss = '5mm';
+        } else if (marginType === 'wide') {
+          marginCss = '20mm';
+        } else {
+          marginCss = '10mm';
+        }
+
         const fullHtml = `
           <!DOCTYPE html>
           <html>
@@ -282,7 +323,10 @@ function setupIpcHandlers() {
               <meta charset="utf-8" />
               <title>${options.title || 'Print Document'}</title>
               <style>
-                @page { size: auto; margin: 10mm; }
+                @page {
+                  size: ${sizeCss} ${orientationCss};
+                  margin: ${marginCss};
+                }
                 @media print {
                   body {
                     -webkit-print-color-adjust: exact !important;
@@ -290,12 +334,195 @@ function setupIpcHandlers() {
                     background: #ffffff !important;
                     color: #000000 !important;
                   }
+                  .page-break {
+                    page-break-after: always !important;
+                    break-after: page !important;
+                  }
+                  .no-break {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                  }
+                }
+                *, *::before, *::after {
+                  box-sizing: border-box;
                 }
                 body {
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                   margin: 0;
                   padding: 0;
                   background: #ffffff;
+                  color: #0f172a;
+                }
+                .document-sheet {
+                  background: #ffffff;
+                  color: #1e293b;
+                  width: 100%;
+                  box-sizing: border-box;
+                  padding: ${marginType === 'none' ? '0' : (marginType === 'narrow' ? '8px' : (marginType === 'wide' ? '24px' : '16px'))};
+                }
+                .doc-header {
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  border-bottom: 2px solid #0f172a;
+                  padding-bottom: 12px;
+                  margin-bottom: 14px;
+                }
+                .doc-brand {
+                  display: flex;
+                  align-items: center;
+                  gap: 14px;
+                }
+                .doc-logo {
+                  max-width: 68px;
+                  max-height: 68px;
+                  object-fit: contain;
+                }
+                .doc-company-name {
+                  font-size: 1.25rem;
+                  font-weight: 800;
+                  color: #0f172a;
+                  letter-spacing: -0.01em;
+                  margin: 0 0 2px 0;
+                  text-transform: uppercase;
+                }
+                .doc-company-detail {
+                  font-size: 0.78rem;
+                  color: #475569;
+                  line-height: 1.35;
+                }
+                .doc-title-badge {
+                  text-align: right;
+                }
+                .doc-type-title {
+                  font-size: 1.15rem;
+                  font-weight: 800;
+                  color: #0f172a;
+                  letter-spacing: 0.05em;
+                  text-transform: uppercase;
+                  margin: 0;
+                }
+                .doc-info-box {
+                  background: #f8fafc;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 6px;
+                  padding: 10px 12px;
+                }
+                .doc-info-box-title {
+                  font-size: 0.7rem;
+                  font-weight: 800;
+                  color: #64748b;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                  border-bottom: 1px solid #e2e8f0;
+                  padding-bottom: 4px;
+                  margin-bottom: 6px;
+                }
+                .doc-row {
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 0.78rem;
+                  line-height: 1.5;
+                }
+                .doc-label {
+                  color: #64748b;
+                  font-weight: 500;
+                }
+                .doc-value {
+                  color: #0f172a;
+                  font-weight: 600;
+                }
+                .doc-value.mono {
+                  font-family: Consolas, "JetBrains Mono", Menlo, monospace;
+                }
+                .doc-table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin-bottom: 14px;
+                  font-size: 0.78rem;
+                }
+                .doc-table th {
+                  background: #0f172a;
+                  color: #ffffff;
+                  padding: 7px 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  font-size: 0.7rem;
+                  letter-spacing: 0.04em;
+                  text-align: left;
+                }
+                .doc-table th.right, .doc-table td.right { text-align: right; }
+                .doc-table th.center, .doc-table td.center { text-align: center; }
+                .doc-table td {
+                  padding: 7px 10px;
+                  border-bottom: 1px solid #e2e8f0;
+                  color: #1e293b;
+                }
+                .doc-table tr:nth-child(even) td { background: #f8fafc; }
+                .doc-table tr.total-row td {
+                  background: #f1f5f9;
+                  font-weight: 700;
+                  border-top: 2px solid #0f172a;
+                  border-bottom: 2px solid #0f172a;
+                  color: #0f172a;
+                }
+                .doc-summary-card {
+                  background: #f8fafc;
+                  border: 1px solid #cbd5e1;
+                  border-radius: 6px;
+                  padding: 10px 14px;
+                  margin-bottom: 16px;
+                }
+                .doc-grand-total {
+                  font-size: 0.96rem;
+                  font-weight: 800;
+                  color: #0f172a;
+                  display: flex;
+                  justify-content: space-between;
+                  padding-top: 6px;
+                  margin-top: 6px;
+                  border-top: 2px solid #0f172a;
+                }
+                .doc-signatures {
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 24px;
+                  margin-top: 24px;
+                  padding-top: 10px;
+                }
+                .doc-sig-block {
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  text-align: center;
+                }
+                .doc-sig-line {
+                  width: 100%;
+                  max-width: 220px;
+                  border-bottom: 1.5px solid #0f172a;
+                  margin-bottom: 6px;
+                }
+                .doc-sig-name {
+                  font-size: 0.88rem;
+                  font-weight: 800;
+                  color: #1e293b;
+                  text-transform: uppercase;
+                  letter-spacing: 0.04em;
+                }
+                .doc-sig-title {
+                  font-size: 0.72rem;
+                  color: #64748b;
+                  margin-top: 2px;
+                }
+                .doc-footer {
+                  margin-top: 16px;
+                  padding-top: 8px;
+                  border-top: 1px dashed #cbd5e1;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  font-size: 0.68rem;
+                  color: #94a3b8;
                 }
               </style>
             </head>
@@ -310,24 +537,49 @@ function setupIpcHandlers() {
         printWin.webContents.on('did-finish-load', () => {
           setTimeout(() => {
             if (!printWin || printWin.isDestroyed()) return;
+
+            // Map margins for Electron print API
+            let marginsOpt = { marginType: 'default' };
+            if (marginType === 'none') {
+              marginsOpt = { marginType: 'none' };
+            } else if (marginType === 'narrow') {
+              marginsOpt = { marginType: 'custom', top: 5, bottom: 5, left: 5, right: 5 };
+            } else if (marginType === 'wide') {
+              marginsOpt = { marginType: 'custom', top: 20, bottom: 20, left: 20, right: 20 };
+            }
+
+            const printSettings = {
+              silent: options.silent !== undefined ? options.silent : true,
+              printBackground: true,
+              deviceName: options.deviceName || '',
+              landscape: isLandscape,
+              copies: Math.max(1, parseInt(options.copies, 10) || 1),
+              margins: marginsOpt
+            };
+
+            // Standard page size or custom micron dimensions
+            if (['A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid'].includes(rawPageSize)) {
+              printSettings.pageSize = rawPageSize;
+            } else if (rawPageSize === 'Roll80' || rawPageSize === '80mm') {
+              printSettings.pageSize = { width: 80000, height: 297000 };
+            } else if (rawPageSize === 'Roll58' || rawPageSize === '58mm') {
+              printSettings.pageSize = { width: 58000, height: 297000 };
+            }
+
             printWin.webContents.print(
-              {
-                silent: options.silent || false,
-                printBackground: true,
-                deviceName: options.deviceName || ''
-              },
+              printSettings,
               (success, failureReason) => {
                 try {
                   if (printWin && !printWin.isDestroyed()) printWin.close();
                 } catch (_) {}
-                if (!success && failureReason !== 'Print job was cancelled') {
+                if (!success && failureReason && failureReason !== 'Print job was cancelled') {
                   resolve({ success: false, error: failureReason });
                 } else {
                   resolve({ success: true, canceled: !success });
                 }
               }
             );
-          }, 250);
+          }, 300);
         });
 
         printWin.webContents.on('did-fail-load', () => {
@@ -358,6 +610,19 @@ function setupIpcHandlers() {
           }
         });
 
+        const rawPageSize = options.pageSize || 'A4';
+        const isLandscape = Boolean(options.landscape);
+        const orientationCss = isLandscape ? 'landscape' : 'portrait';
+
+        let sizeCss = 'A4';
+        if (rawPageSize === 'Roll80' || rawPageSize === '80mm') {
+          sizeCss = '80mm auto';
+        } else if (rawPageSize === 'Roll58' || rawPageSize === '58mm') {
+          sizeCss = '58mm auto';
+        } else if (['Letter', 'Legal', 'A3', 'A4', 'A5'].includes(rawPageSize)) {
+          sizeCss = rawPageSize;
+        }
+
         const fullHtml = `
           <!DOCTYPE html>
           <html>
@@ -365,7 +630,7 @@ function setupIpcHandlers() {
               <meta charset="utf-8" />
               <title>${options.title || 'Document'}</title>
               <style>
-                @page { size: A4; margin: 10mm; }
+                @page { size: ${sizeCss} ${orientationCss}; margin: 10mm; }
                 @media print {
                   body {
                     -webkit-print-color-adjust: exact !important;
@@ -394,6 +659,7 @@ function setupIpcHandlers() {
               if (!printWin || printWin.isDestroyed()) return;
               const pdfBuffer = await printWin.webContents.printToPDF({
                 pageSize: options.pageSize || 'A4',
+                landscape: Boolean(options.landscape),
                 printBackground: true,
                 margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 }
               });
