@@ -26,5 +26,7 @@
         <preference name="StatusBarBackgroundColor" value="#0f172a" />
         <preference name="StatusBarStyle" value="lightcontent" />
         <preference name="loadUrlTimeoutValue" value="70000" />
+        <preference name="SplashScreenBackgroundColor" value="#0f172a" />
+        <splash src="public/logo.png" />
     </platform>
 </widget>
