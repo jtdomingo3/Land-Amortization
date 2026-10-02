@@ -205,6 +205,26 @@ Or tap the `.apk` file directly in your Android file manager to install.
 - **Supabase Credentials**: Project URL and Key are masked and dynamically reconstituted at runtime to defeat binary string extraction and reverse engineering.
 - **File System Permissions**: `WRITE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE`, and `requestLegacyExternalStorage="true"` are enabled in `AndroidManifest.xml` to allow `.xlsx` workbook generation to external phone storage.
 
+---
+
+### Optional: SQL Command to Empty / Clear Supabase Cloud Database
+
+> [!CAUTION]
+> **Administrative / Developer Command Only**: Run in your Supabase SQL Editor. This is not exposed in the app to prevent accidental user deletion.
+
+```sql
+-- OPTION 1: Empty all records while preserving table schemas and RLS security policies
+TRUNCATE TABLE land_payments, land_accounts CASCADE;
+```
+
+```sql
+-- OPTION 2: Completely drop tables and remove all schemas (start fresh from scratch)
+DROP TABLE IF EXISTS land_payments CASCADE;
+DROP TABLE IF EXISTS land_accounts CASCADE;
+```
+
+---
+
 ## Privacy & Security
 
 - All buyer records, payments, and financial calculations remain strictly on the device's local storage.
