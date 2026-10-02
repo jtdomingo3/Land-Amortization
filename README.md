@@ -378,6 +378,6 @@ DROP TABLE IF EXISTS land_accounts CASCADE;
 
 ## License & Credits
 
-- **System**: Cortez Land Amortization Collection Tracker
+- **System**: Land Amortization Collection Tracker
 - **Developer**: Gezyne-Jamir Software Tech
 - **Proprietary Software**: All rights reserved.
