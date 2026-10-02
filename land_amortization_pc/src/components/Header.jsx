@@ -1,9 +1,16 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { Download, Sun, Moon, RotateCw, Cloud, HardDrive, Bell } from 'lucide-react';
+import { formatLastSync } from '../utils/formatters.js';
 
-export function Header({ onSync, isSyncing, syncStatus }) {
-  const { activeTab, setActiveTab, theme, toggleTheme, refreshData, loading } = useApp();
+export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
+  const app = useApp();
+  const { activeTab, setActiveTab, theme, toggleTheme, refreshData, loading } = app;
+
+  const currentOnSync = onSync || app.syncCloud;
+  const currentIsSyncing = isSyncing !== undefined ? isSyncing : app.isSyncing;
+  const currentSyncStatus = syncStatus !== undefined ? syncStatus : app.syncStatus;
+  const currentLastSyncedAt = lastSyncedAt !== undefined ? lastSyncedAt : app.lastSyncedAt;
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -36,17 +43,71 @@ export function Header({ onSync, isSyncing, syncStatus }) {
       </div>
 
       <div className="header-actions">
-        {/* Supabase Sync Button */}
-        {onSync && (
-          <button
-            className={`btn btn-secondary btn-sm header-sync-btn ${isSyncing ? 'syncing' : ''}`}
-            onClick={onSync}
-            disabled={isSyncing}
-            title={syncStatus || 'Sync with Supabase Cloud'}
+        {/* Supabase Sync Button with Live Date & Time of Last Sync */}
+        {currentOnSync && (
+          <div
+            className="header-sync-container"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              userSelect: 'none'
+            }}
           >
-            <Cloud size={16} className={isSyncing ? 'animate-spin' : ''} />
-            <span className="btn-text">{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-          </button>
+            <button
+              className={`btn btn-secondary btn-sm header-sync-btn ${currentIsSyncing ? 'syncing' : ''}`}
+              onClick={() => currentOnSync()}
+              disabled={currentIsSyncing}
+              title={
+                currentLastSyncedAt
+                  ? `Last Synced: ${new Date(currentLastSyncedAt).toLocaleString()}\nClick to synchronize now with Supabase Cloud`
+                  : (currentSyncStatus || 'Sync with Supabase Cloud')
+              }
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 12px',
+                height: 32
+              }}
+            >
+              <Cloud
+                size={15}
+                className={currentIsSyncing ? 'animate-spin' : ''}
+                color={currentIsSyncing ? 'var(--accent-cyan)' : (currentLastSyncedAt ? 'var(--accent-emerald)' : 'var(--text-secondary)')}
+              />
+              <span className="btn-text">{currentIsSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
+              {currentLastSyncedAt && !currentIsSyncing && (
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--accent-emerald)',
+                    display: 'inline-block',
+                    boxShadow: '0 0 6px var(--accent-emerald)'
+                  }}
+                  title="Connected & Synced"
+                />
+              )}
+            </button>
+
+            <span
+              className="header-sync-time"
+              style={{
+                fontSize: '0.64rem',
+                color: currentIsSyncing ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                marginTop: 2,
+                fontWeight: 600,
+                lineHeight: 1,
+                whiteSpace: 'nowrap'
+              }}
+              title={currentLastSyncedAt ? `Last Synced: ${new Date(currentLastSyncedAt).toLocaleString()}` : 'Not synchronized yet'}
+            >
+              {currentIsSyncing ? 'Syncing...' : (currentLastSyncedAt ? `Synced: ${formatLastSync(currentLastSyncedAt)}` : 'Never synced')}
+            </span>
+          </div>
         )}
 
         {/* Refresh Database Data */}

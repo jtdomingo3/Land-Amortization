@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   initDatabase,
   getAccounts,
@@ -19,6 +19,9 @@ import { computeDashboard } from '../engine/dashboard.js';
 import { saveWorkbookToDevice } from '../export/excelExport.js';
 import { shareToGoogleDrive } from '../share/shareFile.js';
 import {
+  syncWithSupabase,
+  getSupabaseConfig,
+  saveSupabaseConfig,
   syncUpsertAccount,
   syncDeleteAccount,
   syncUpsertPayment,
@@ -33,6 +36,21 @@ export function AppProvider({ children }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [isCordova, setIsCordova] = useState(false);
+
+  // Cloud Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => {
+    try {
+      const cfg = getSupabaseConfig();
+      return cfg.lastSyncedAt || localStorage.getItem('land_amortization_last_synced') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isSyncingRef = useRef(false);
+  const autoSyncTimerRef = useRef(null);
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -108,6 +126,64 @@ export function AppProvider({ children }) {
     }
   }, [recompute]);
 
+  // Full Bidirectional Cloud Sync
+  const syncCloud = useCallback(async (options = {}) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    setIsSyncing(true);
+
+    if (!options.silent) {
+      setSyncStatus('Connecting to Supabase...');
+    }
+
+    try {
+      const res = await syncWithSupabase();
+      if (res && res.success) {
+        const now = res.timestamp || new Date().toISOString();
+        setLastSyncedAt(now);
+        try {
+          localStorage.setItem('land_amortization_last_synced', now);
+          saveSupabaseConfig({ lastSyncedAt: now });
+        } catch (_) {}
+
+        if (!options.silent) {
+          setSyncStatus(`Sync complete! ${res.message || ''}`);
+        }
+        // Refresh local data in case new records were pulled
+        await refreshData();
+        return res;
+      } else {
+        if (!options.silent && res?.message) {
+          setSyncStatus(`Sync notice: ${res.message}`);
+        }
+        return res;
+      }
+    } catch (err) {
+      console.warn('[Cloud Sync] Error during sync:', err);
+      if (!options.silent) {
+        setSyncStatus(`Sync error: ${err.message}`);
+      }
+      return { success: false, message: err.message };
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncing(false);
+      if (!options.silent) {
+        setTimeout(() => setSyncStatus(null), 5000);
+      }
+    }
+  }, [refreshData]);
+
+  // Debounced auto-sync trigger after database modifications
+  const triggerAutoSync = useCallback(() => {
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+    }
+    autoSyncTimerRef.current = setTimeout(() => {
+      console.log('[Cloud Sync] Auto-sync triggered after data changes...');
+      syncCloud({ silent: true });
+    }, 800);
+  }, [syncCloud]);
+
   useEffect(() => {
     const init = async () => {
       const isCordovaEnv = Boolean(window.cordova || window.sqlitePlugin);
@@ -117,6 +193,12 @@ export function AppProvider({ children }) {
         try {
           await initDatabase();
           await refreshData();
+
+          // Auto-sync upon opening (after database is loaded)
+          setTimeout(() => {
+            console.log('[Cloud Sync] Auto-sync upon app opening...');
+            syncCloud({ silent: true });
+          }, 1200);
         } catch (e) {
           console.error('Initialization error:', e);
           setError(e.message);
@@ -127,18 +209,18 @@ export function AppProvider({ children }) {
       if (window.cordova) {
         document.addEventListener('deviceready', onDeviceReady, false);
       } else {
-        // Run immediately for web/browser
+        // Run immediately for web/desktop
         onDeviceReady();
       }
     };
 
     init();
-  }, [refreshData]);
+  }, [refreshData, syncCloud]);
 
   // CRUD Actions
   const handleAddAccount = async (accountData) => {
     await insertAccount(accountData);
-    syncUpsertAccount(accountData); // Auto-sync to cloud if online
+    syncUpsertAccount(accountData); // Direct single item push
 
     // If down payment is marked as paid upfront, automatically create initial Down Payment payment record
     if (Number(accountData.is_dp_paid) === 1 && Number(accountData.down_payment) > 0) {
@@ -156,18 +238,21 @@ export function AppProvider({ children }) {
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleUpdateAccount = async (accountData) => {
     await dbUpdateAccount(accountData);
     syncUpsertAccount(accountData);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleDeleteAccount = async (accountId) => {
     await dbDeleteAccount(accountId);
     syncDeleteAccount(accountId);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleAddPayment = async (paymentData) => {
@@ -199,12 +284,14 @@ export function AppProvider({ children }) {
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleUpdatePayment = async (paymentData) => {
     await dbUpdatePayment(paymentData);
     syncUpsertPayment(paymentData);
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleDeletePayment = async (paymentId) => {
@@ -235,6 +322,7 @@ export function AppProvider({ children }) {
     }
 
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleExportExcel = async (customFileName) => {
@@ -272,11 +360,13 @@ export function AppProvider({ children }) {
   const handleResetSample = async () => {
     await resetToSampleData();
     await refreshData();
+    triggerAutoSync();
   };
 
   const handleClearAll = async () => {
     await clearAllData();
     await refreshData();
+    triggerAutoSync();
   };
 
   const value = {
@@ -295,6 +385,11 @@ export function AppProvider({ children }) {
     payments,
     dashboard,
     exportLogs,
+    isSyncing,
+    syncStatus,
+    lastSyncedAt,
+    syncCloud,
+    triggerAutoSync,
     addAccount: handleAddAccount,
     updateAccount: handleUpdateAccount,
     deleteAccount: handleDeleteAccount,

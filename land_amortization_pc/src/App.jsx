@@ -14,27 +14,19 @@ import { Loader2 } from 'lucide-react';
 import { syncWithSupabase } from './services/supabaseSync.js';
 
 export function App() {
-  const { activeTab, loading, error, refreshData } = useApp();
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState(null);
+  const {
+    activeTab,
+    loading,
+    error,
+    refreshData,
+    isSyncing,
+    syncStatus,
+    lastSyncedAt,
+    syncCloud
+  } = useApp();
 
-  const handleSyncCloud = async () => {
-    setIsSyncing(true);
-    setSyncStatus('Connecting to Supabase...');
-    try {
-      const res = await syncWithSupabase();
-      if (res.success) {
-        setSyncStatus(`Sync complete! ${res.message || ''}`);
-        await refreshData();
-      } else {
-        setSyncStatus(`Sync notice: ${res.message}`);
-      }
-    } catch (err) {
-      setSyncStatus(`Sync error: ${err.message}`);
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => setSyncStatus(null), 5000);
-    }
+  const handleSyncCloud = () => {
+    return syncCloud({ silent: false });
   };
 
   if (loading) {
@@ -70,7 +62,7 @@ export function App() {
       case 'schedule':
         return <SchedulePage />;
       case 'export':
-        return <ExportSharePage onSync={handleSyncCloud} isSyncing={isSyncing} syncStatus={syncStatus} />;
+        return <ExportSharePage onSync={handleSyncCloud} isSyncing={isSyncing} syncStatus={syncStatus} lastSyncedAt={lastSyncedAt} />;
       case 'settings':
         return <SettingsPage />;
       case 'help':
@@ -92,6 +84,7 @@ export function App() {
             onSync={handleSyncCloud}
             isSyncing={isSyncing}
             syncStatus={syncStatus}
+            lastSyncedAt={lastSyncedAt}
           />
 
           {error && (

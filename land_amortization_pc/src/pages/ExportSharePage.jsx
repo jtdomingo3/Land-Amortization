@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
-import { formatDate, toISODateString } from '../utils/formatters.js';
+import { formatDate, toISODateString, formatLastSync } from '../utils/formatters.js';
 import { getFileNamePresets } from '../export/excelExport.js';
 import {
   CloudUpload,
@@ -22,7 +22,7 @@ import {
 import { GoogleDriveModal } from '../components/GoogleDriveModal.jsx';
 import { getGoogleDriveConfig, openGoogleDriveFolder, uploadToGoogleDrive } from '../services/googleDriveService.js';
 
-export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
+export function ExportSharePage({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
   const {
     accounts,
     payments,
@@ -201,22 +201,28 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {onSync && (
-              <button
-                className="btn btn-primary"
-                onClick={onSync}
-                disabled={isSyncing}
-                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
-              >
-                <Cloud size={16} className={isSyncing ? 'animate-spin' : ''} />
-                <span>{isSyncing ? 'Syncing...' : 'Sync Cloud Now'}</span>
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={onSync}
+                  disabled={isSyncing}
+                  style={{ padding: '8px 18px', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Cloud size={16} className={isSyncing ? 'animate-spin' : ''} />
+                  <span>{isSyncing ? 'Syncing...' : 'Sync Cloud Now'}</span>
+                </button>
+                <span style={{ fontSize: '0.72rem', color: isSyncing ? 'var(--accent-cyan)' : 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>
+                  {isSyncing ? 'Synchronizing...' : (lastSyncedAt ? `Last Synced: ${formatLastSync(lastSyncedAt)}` : 'Not synchronized yet')}
+                </span>
+              </div>
             )}
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => setActiveTab('settings')}
               title="Configure Supabase URL & Key"
+              style={{ alignSelf: 'flex-start', marginTop: 2 }}
             >
               <Settings size={15} />
               <span>Configure Sync</span>

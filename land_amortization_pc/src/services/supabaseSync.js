@@ -358,6 +358,9 @@ export async function syncUpsertAccount(account) {
       updated_at: new Date().toISOString()
     };
     await client.from('land_accounts').upsert(clean, { onConflict: 'account_id' });
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-synced account to Supabase:', account.account_id);
   } catch (err) {
     console.warn('[Cloud Sync] Auto-sync account deferred:', err.message);
@@ -374,6 +377,9 @@ export async function syncDeleteAccount(accountId) {
 
   try {
     await client.from('land_accounts').delete().eq('account_id', accountId);
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-deleted account from Supabase:', accountId);
   } catch (err) {
     console.warn('[Cloud Sync] Auto-delete account deferred:', err.message);
@@ -401,6 +407,9 @@ export async function syncUpsertPayment(payment) {
       updated_at: new Date().toISOString()
     };
     await client.from('land_payments').upsert(clean, { onConflict: 'payment_id' });
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-synced payment to Supabase:', payment.payment_id);
   } catch (err) {
     console.warn('[Cloud Sync] Auto-sync payment deferred:', err.message);
@@ -417,6 +426,9 @@ export async function syncDeletePayment(paymentId) {
 
   try {
     await client.from('land_payments').delete().eq('payment_id', paymentId);
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-deleted payment from Supabase:', paymentId);
   } catch (err) {
     console.warn('[Cloud Sync] Auto-delete payment deferred:', err.message);

@@ -33,6 +33,7 @@ import {
   syncWithSupabase,
   SUPABASE_SQL_SCHEMA
 } from '../services/supabaseSync.js';
+import { formatLastSync } from '../utils/formatters.js';
 
 export function SettingsPage() {
   const { resetSample, clearAll, refreshData, setActiveTab } = useApp();
@@ -566,8 +567,8 @@ export function SettingsPage() {
             </div>
           </div>
           {sbConfig.lastSyncedAt && (
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--bg-surface)', padding: '3px 8px', borderRadius: 6 }}>
-              Last Synced: {new Date(sbConfig.lastSyncedAt).toLocaleTimeString()}
+            <span style={{ fontSize: '0.74rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+              Last Synced: {formatLastSync(sbConfig.lastSyncedAt)}
             </span>
           )}
         </div>
