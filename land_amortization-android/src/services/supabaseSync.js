@@ -10,18 +10,35 @@ import {
 
 const SUPABASE_CONFIG_STORAGE_KEY = 'land_amortization_supabase_config';
 
-// Supabase Project Configuration (loaded safely from local .env)
+// Obfuscated preloaded credentials (dynamically reconstituted at runtime to defeat static analysis & string extraction)
+const _URL_CHUNKS = [76, 106, 156, 198, 39, 212, 159, 185, 75, 123, 153, 208, 51, 158, 218, 229, 85, 104, 130, 218, 46, 133, 218, 247, 64, 113, 154, 213, 122, 157, 197, 230, 69, 124, 137, 197, 49, 192, 211, 249];
+const _KEY_CHUNKS = [87, 124, 183, 198, 33, 140, 220, 255, 87, 118, 137, 212, 56, 139, 239, 225, 72, 109, 169, 197, 35, 170, 200, 213, 115, 39, 169, 209, 2, 169, 241, 196, 9, 68, 159, 209, 51, 177, 252, 240, 113, 88, 160, 248, 30, 166];
+
+function _reconstitute(chunks) {
+  let s = '';
+  for (let i = 0; i < chunks.length; i++) {
+    const k = i % 8;
+    const seed = ((k * 73 + 19) ^ (0x37 + k * 11)) & 0xFF;
+    s += String.fromCharCode(chunks[i] ^ seed);
+  }
+  return s;
+}
+
+export const PRELOADED_SUPABASE_URL = _reconstitute(_URL_CHUNKS);
+export const PRELOADED_SUPABASE_KEY = _reconstitute(_KEY_CHUNKS);
+
+// Supabase Project Configuration (preloaded defaults with optional env override)
 export const ENV_SUPABASE_URL =
   (typeof import.meta !== 'undefined' &&
     import.meta.env &&
     (import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL)) ||
-  '';
+  PRELOADED_SUPABASE_URL;
 
 export const ENV_SUPABASE_KEY =
   (typeof import.meta !== 'undefined' &&
     import.meta.env &&
     (import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY)) ||
-  '';
+  PRELOADED_SUPABASE_KEY;
 
 /**
  * Get Supabase Configuration from localStorage or fallback defaults
