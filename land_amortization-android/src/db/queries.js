@@ -20,21 +20,46 @@ export const CREATE_TABLE_ACCOUNTS = `
 
 export const CREATE_TABLE_PAYMENTS = `
   CREATE TABLE IF NOT EXISTS payments (
-    payment_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-    account_id     INTEGER NOT NULL,
-    payment_date   TEXT NOT NULL,
-    payment_type   TEXT NOT NULL DEFAULT 'Installment',
-    amount_paid    REAL NOT NULL,
-    receipt_no     TEXT,
-    payment_method TEXT DEFAULT 'Cash',
-    remarks        TEXT,
-    created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
+    payment_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER NOT NULL,
+    payment_date        TEXT NOT NULL,
+    payment_type        TEXT NOT NULL DEFAULT 'Monthly Amortization',
+    amount_paid         REAL NOT NULL,
+    receipt_no          TEXT,
+    payment_method      TEXT DEFAULT 'Cash',
+    remarks             TEXT,
+    month_covered       TEXT,
+    for_month_no        INTEGER,
+    amortization_amount REAL DEFAULT 0,
+    penalty_amount      REAL DEFAULT 0,
+    created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
   );
 `;
 
 export const CREATE_INDEX_PAYMENTS = `
   CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(account_id, payment_type);
+`;
+
+export const CREATE_TABLE_PENALTIES = `
+  CREATE TABLE IF NOT EXISTS penalties (
+    penalty_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id     INTEGER NOT NULL,
+    penalty_type   TEXT NOT NULL,
+    month_no       INTEGER,
+    month_covered  TEXT,
+    amount         REAL NOT NULL,
+    assessed_date  TEXT NOT NULL,
+    status         TEXT DEFAULT 'UNPAID',
+    amount_paid    REAL DEFAULT 0,
+    remarks        TEXT,
+    created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
+  );
+`;
+
+export const CREATE_INDEX_PENALTIES = `
+  CREATE INDEX IF NOT EXISTS idx_penalties_account ON penalties(account_id, status);
 `;
 
 export const CREATE_TABLE_SETTINGS = `

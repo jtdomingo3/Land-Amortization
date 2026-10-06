@@ -26,6 +26,9 @@ export function computeDashboard(accountsWithDerived = []) {
   let paidAccounts = 0;
   let penaltyAccounts = 0;
 
+  let penaltiesCollected = 0;
+  let penaltiesBalance = 0;
+
   for (const acc of accountsWithDerived) {
     totalContractAmount += Number(acc.total_contract_amount) || 0;
     totalDownPayments += Number(acc.down_payment) || 0;
@@ -34,6 +37,8 @@ export function computeDashboard(accountsWithDerived = []) {
     dpPenalties += Number(acc.dp_penalty) || 0;
     tenPercentPenalties += Number(acc.ten_percent_penalty) || 0;
     totalPenalties += Number(acc.total_penalties) || 0;
+    penaltiesCollected += Number(acc.penalties_paid) || 0;
+    penaltiesBalance += Number(acc.penalties_balance) || 0;
     totalAmountDue += Number(acc.total_amount_due) || 0;
     outstandingBalance += Number(acc.outstanding_balance) || 0;
 
@@ -67,6 +72,8 @@ export function computeDashboard(accountsWithDerived = []) {
     dpPenalties,
     tenPercentPenalties,
     totalPenalties,
+    penaltiesCollected,
+    penaltiesBalance,
     totalAmountDue,
     outstandingBalance,
     activeAccounts,

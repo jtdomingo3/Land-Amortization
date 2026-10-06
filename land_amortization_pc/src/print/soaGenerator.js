@@ -173,6 +173,7 @@ export function generateSOAHTML(account, payments = [], options = {}) {
               <th>Date</th>
               <th>Receipt / Ref #</th>
               <th>Payment Type</th>
+              <th>Month Covered</th>
               <th>Method</th>
               <th class="right">Amount Paid</th>
               <th>Remarks</th>
@@ -181,21 +182,25 @@ export function generateSOAHTML(account, payments = [], options = {}) {
           <tbody>
             ${filteredPayments.length === 0 ? `
               <tr>
-                <td colspan="6" style="text-align: center; color: #94a3b8; padding: 12px;">No payment transactions recorded during this period.</td>
+                <td colspan="7" style="text-align: center; color: #94a3b8; padding: 12px;">No payment transactions recorded during this period.</td>
               </tr>
             ` : filteredPayments.map(p => `
               <tr>
                 <td>${formatDate(p.payment_date)}</td>
                 <td class="mono">${p.receipt_no || '-'}</td>
                 <td>${p.payment_type || 'Installment'}</td>
+                <td style="font-size: 0.74rem; color: ${p.month_covered ? '#4338ca' : '#94a3b8'}; font-weight: ${p.month_covered ? '600' : 'normal'};">${p.month_covered || '-'}</td>
                 <td>${p.payment_method || 'Cash'}</td>
-                <td class="right mono" style="font-weight: 700; color: #047857;">${formatCurrency(p.amount_paid)}</td>
+                <td class="right mono" style="font-weight: 700; color: #047857;">
+                  ${formatCurrency(p.amount_paid)}
+                  ${Number(p.penalty_amount) > 0 ? `<div style="font-size: 0.66rem; color: #b45309; font-weight: normal;">(Pen: ${formatCurrency(p.penalty_amount)})</div>` : ''}
+                </td>
                 <td style="color: #64748b; font-size: 0.72rem;">${p.remarks || '-'}</td>
               </tr>
             `).join('')}
             ${filteredPayments.length > 0 ? `
               <tr class="total-row">
-                <td colspan="4" style="text-transform: uppercase;">Total Period Payments</td>
+                <td colspan="5" style="text-transform: uppercase;">Total Period Payments</td>
                 <td class="right mono" style="font-size: 0.88rem; color: #047857;">${formatCurrency(totalPeriodPaid)}</td>
                 <td></td>
               </tr>
@@ -296,9 +301,9 @@ export function generateSOAHTML(account, payments = [], options = {}) {
               </span>
             </div>
             <div class="doc-row">
-              <span class="doc-label">Total Penalties Due:</span>
-              <span class="doc-value mono" style="color: ${account.total_penalties > 0 ? '#b91c1c' : 'inherit'};">
-                ${formatCurrency(account.total_penalties)}
+              <span class="doc-label">Outstanding Penalty Balance:</span>
+              <span class="doc-value mono" style="color: ${(account.penalties_balance !== undefined ? account.penalties_balance : account.total_penalties) > 0 ? '#b91c1c' : 'inherit'}; font-weight: 700;">
+                ${formatCurrency(account.penalties_balance !== undefined ? account.penalties_balance : account.total_penalties)}
               </span>
             </div>
           </div>

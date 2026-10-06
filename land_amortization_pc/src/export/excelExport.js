@@ -118,9 +118,10 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
   // SHEET 3: Payments
   // ============================================
   const paymentHeaders = [
-    'Payment ID', 'Account ID', 'Name', 'Due Date', 'Payment Date',
-    'Payment Type', 'Amount Paid', 'OR/Receipt No.', 'Payment Method',
-    'Month Covered', 'Remarks'
+    'Payment ID', 'Account ID', 'Name', 'Payment Date',
+    'Payment Type', 'For Month No.', 'Month Covered', 'Amortization Amount',
+    'Penalty Amount', 'Total Amount Paid', 'OR/Receipt No.', 'Payment Method',
+    'Remarks'
   ];
 
   const paymentRows = [paymentHeaders];
@@ -129,21 +130,24 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
       p.payment_id,
       p.account_id,
       p.name,
-      p.due_date,
       p.payment_date,
       p.payment_type,
+      p.for_month_no || '',
+      p.month_covered || '',
+      p.amortization_amount !== undefined ? p.amortization_amount : (p.payment_type === 'Penalty' ? 0 : p.amount_paid),
+      p.penalty_amount || (p.payment_type === 'Penalty' ? p.amount_paid : 0),
       p.amount_paid,
       p.receipt_no,
       p.payment_method,
-      p.month_covered,
       p.remarks || ''
     ]);
   }
 
   const wsPayments = XLSX.utils.aoa_to_sheet(paymentRows);
   wsPayments['!cols'] = [
-    { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 14 },
-    { wch: 16 }, { wch: 15 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
+    { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 14 },
+    { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 20 },
+    { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
     { wch: 25 }
   ];
   XLSX.utils.book_append_sheet(wb, wsPayments, 'Payments');

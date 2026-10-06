@@ -4,15 +4,16 @@ import { formatMonthCovered } from '../utils/formatters.js';
 import { ACCOUNT_STATUSES, SCHEDULE_STATUSES } from '../utils/constants.js';
 
 /**
- * Computes all 13 derived fields for a Land Account (columns L through W).
- * Exactly matches the Excel formulas in 'Land Accounts' sheet.
+ * Computes all derived fields for a Land Account (columns L through W).
+ * Accurately tracks principal, schedule waterfall, and persistent penalties.
  * 
  * @param {Object} account - Raw account from database
  * @param {Array<Object>} payments - All payments for this account
  * @param {Date} [todayRef] - Current date reference
+ * @param {Array<Object>} [penalties] - Persisted penalties records for this account
  * @returns {Object} Account with all computed fields attached
  */
-export function computeAccountDerived(account, payments = [], todayRef = new Date()) {
+export function computeAccountDerived(account, payments = [], todayRef = new Date(), penalties = []) {
   if (!account) return null;
 
   const totalContract = Number(account.total_contract_amount) || 0;
@@ -25,7 +26,10 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
   );
 
   const installmentPayments = accountPayments.filter(
-    p => p.payment_type === 'Installment' || p.payment_type === undefined
+    p => p.payment_type === 'Installment' || 
+         p.payment_type === 'Monthly Amortization' || 
+         p.payment_type === 'Amortization + Penalty' || 
+         p.payment_type === undefined
   );
   const dpPayments = accountPayments.filter(
     p => p.payment_type === 'Down Payment'
@@ -34,10 +38,18 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     p => p.payment_type === 'Other'
   );
 
-  // Column L: Installments Paid
-  const installmentsPaid = installmentPayments.reduce(
-    (sum, p) => sum + (Number(p.amount_paid) || 0), 0
-  );
+  // Column L: Installments Paid (applied to principal contract)
+  const installmentsPaid = installmentPayments.reduce((sum, p) => {
+    if (p.payment_type === 'Amortization + Penalty') {
+      const aPortion = Number(p.amortization_amount);
+      const total = Number(p.amount_paid) || 0;
+      const pPortion = Number(p.penalty_amount) || 0;
+      return sum + (!isNaN(aPortion) && aPortion > 0 ? aPortion : Math.max(0, total - pPortion));
+    }
+    return sum + (Number(p.amount_paid) || 0);
+  }, 0);
+
+  // Total Down Payment Paid
   const dpFromPayments = dpPayments.reduce(
     (sum, p) => sum + (Number(p.amount_paid) || 0), 0
   );
@@ -45,7 +57,6 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     (sum, p) => sum + (Number(p.amount_paid) || 0), 0
   );
 
-  // Total Down Payment Paid
   const isDpPaidFlag = account.is_dp_paid === 1 || account.is_dp_paid === true || (account.is_dp_paid === undefined && downPayment > 0 && dpPayments.length === 0);
   const totalDpPaid = dpPayments.length > 0
     ? dpFromPayments
@@ -53,23 +64,53 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
 
   const isDpFullyPaid = downPayment <= 0 || totalDpPaid >= downPayment;
 
-  // Column M: Total Paid (all down payments + installments + other payments)
-  const totalPaid = totalDpPaid + installmentsPaid + otherPaid;
+  // Penalties Paid by Customer
+  const penaltiesPaid = accountPayments.reduce((sum, p) => {
+    if (p.payment_type === 'Penalty') {
+      return sum + (Number(p.amount_paid) || 0);
+    }
+    if (p.payment_type === 'Amortization + Penalty') {
+      const pPortion = Number(p.penalty_amount);
+      if (!isNaN(pPortion) && pPortion > 0) return sum + pPortion;
+    }
+    return sum + (Number(p.penalty_amount) || 0);
+  }, 0);
 
-  // Column N: Base Balance
-  const baseBalance = Math.max(0, totalContract - totalPaid);
+  // Total collected from buyer (principal + penalties)
+  const totalCollected = totalDpPaid + installmentsPaid + otherPaid + penaltiesPaid;
+  // Principal paid towards the land contract
+  const totalPrincipalPaid = totalDpPaid + installmentsPaid + otherPaid;
+
+  // Column N: Base Balance (Principal remaining on contract)
+  const baseBalance = Math.max(0, totalContract - totalPrincipalPaid);
+
+  // Filter persisted penalties for this account
+  const accountPenalties = penalties.filter(
+    pen => String(pen.account_id) === String(account.account_id)
+  );
 
   // Column O: Down Payment Penalty (1% of Total Contract Amount)
-  // Triggered when agreed DP date has lapsed and down payment remains unpaid
+  // Triggered when agreed DP date has lapsed and down payment was not paid on or before that due date
   let dpPenalty = 0;
-  if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && totalDpPaid <= 0 && downPayment > 0) {
-    dpPenalty = Math.round(totalContract * 0.01 * 100) / 100;
+  const savedDpPenalty = accountPenalties.find(
+    pen => (pen.penalty_type === '1% DP Penalty' || pen.month_covered === 'Down Payment') && pen.status !== 'WAIVED'
+  );
+
+  if (savedDpPenalty) {
+    dpPenalty = Number(savedDpPenalty.amount) || 0;
+  } else if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && downPayment > 0) {
+    // Was DP paid on time?
+    const onTimeDp = dpPayments.filter(p => !isBeforeToday(agreedDpDue, p.payment_date));
+    const onTimePaid = onTimeDp.reduce((s, p) => s + (Number(p.amount_paid) || 0), 0);
+    if (onTimePaid < downPayment) {
+      dpPenalty = Math.round(totalContract * 0.01 * 100) / 100;
+    }
   }
 
   // Generate monthly schedule to get consecutive missed and next due date
   const schedule = computeMonthlySchedule(account, accountPayments, todayRef);
 
-  // Column P: Consecutive Missed Months
+  // Current Consecutive Missed Months in schedule
   let consecutiveMissed = 0;
   for (const row of schedule) {
     if (row.consecutive_missed > consecutiveMissed) {
@@ -77,7 +118,7 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     }
   }
 
-  // Calculate total overdue unpaid amount for delayed months
+  // Calculate current overdue unpaid amount for delayed months
   const overdueRows = schedule.filter(
     row => row.payment_status === SCHEDULE_STATUSES.OVERDUE || 
            (row.payment_status === SCHEDULE_STATUSES.PARTIAL && row.due_date && isBeforeToday(row.due_date, todayRef))
@@ -86,28 +127,63 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     (sum, row) => sum + Math.max(0, row.expected_amortization - row.amount_applied), 0
   );
 
-  // Column Q: 10% Penalty when 2+ consecutive months are missed
-  // Customer rule: "10% sa delayed months" (10% of overdue installments)
-  // Also calculate on base balance for comparison/alternative contracts
-  const tenPercentDelayedPenalty = consecutiveMissed >= 2 ? Math.round(delayedMonthsAmount * 0.10 * 100) / 100 : 0;
-  const tenPercentBalancePenalty = consecutiveMissed >= 2 ? Math.round(baseBalance * 0.10 * 100) / 100 : 0;
+  // Column Q: 10% Late Payment Penalty
+  // Check if persisted 10% penalty records exist
+  const savedLatePenalties = accountPenalties.filter(
+    pen => pen.penalty_type === '10% Late Penalty' && pen.status !== 'WAIVED'
+  );
+  const savedLatePenaltyAmount = savedLatePenalties.reduce(
+    (sum, pen) => sum + (Number(pen.amount) || 0), 0
+  );
 
-  // Default to customer's requested rule (10% on delayed months), unless contract specifies 'balance'
-  const penaltyRule = account.penalty_basis === 'balance' ? 'balance' : 'delayed_months';
-  const tenPercentPenalty = penaltyRule === 'balance' ? tenPercentBalancePenalty : tenPercentDelayedPenalty;
+  // Compute currently overdue penalty
+  const currentOverdueTenPercent = consecutiveMissed >= 2
+    ? (account.penalty_basis === 'balance'
+        ? Math.round(baseBalance * 0.10 * 100) / 100
+        : Math.round(delayedMonthsAmount * 0.10 * 100) / 100)
+    : 0;
 
-  // Column R: Total Penalties
-  const totalPenalties = dpPenalty + tenPercentPenalty;
+  // Chronological check for 2+ consecutive missed streaks:
+  const { lateMonthsCount, penaltyAmount: chronologicalLatePenalty } = computeLatePenaltyMonths(
+    schedule,
+    installmentPayments,
+    Number(account.monthly_amortization) || 0,
+    todayRef
+  );
 
-  // Column S: Total Amount Due
+  const chronologicalPenaltyAmount = (account.penalty_basis === 'balance' && lateMonthsCount >= 2)
+    ? Math.round(baseBalance * 0.10 * 100) / 100
+    : chronologicalLatePenalty;
+
+  // The 10% penalty incurred is the maximum of saved penalty records, current overdue penalty, and chronological streak penalty
+  const tenPercentPenaltyIncurred = Math.max(
+    savedLatePenaltyAmount,
+    currentOverdueTenPercent,
+    chronologicalPenaltyAmount
+  );
+
+  // Manual / Other penalties from penalties table
+  const savedOtherPenalties = accountPenalties.filter(
+    pen => pen.penalty_type !== '10% Late Penalty' && pen.penalty_type !== '1% DP Penalty' && pen.status !== 'WAIVED'
+  );
+  const otherPenaltiesAmount = savedOtherPenalties.reduce(
+    (sum, pen) => sum + (Number(pen.amount) || 0), 0
+  );
+
+  // Total Penalties Incurred across all types
+  const totalPenaltiesIncurred = dpPenalty + tenPercentPenaltyIncurred + otherPenaltiesAmount;
+
+  // Outstanding Penalties Balance (Total Incurred minus Penalties Paid)
+  const outstandingPenalties = Math.max(0, Math.round((totalPenaltiesIncurred - penaltiesPaid) * 100) / 100);
+
+  // Column R: Total Penalties Due (the remaining unpaid penalty balance)
+  const totalPenalties = outstandingPenalties;
+
+  // Column S & T: Total Amount Due & Outstanding Balance
   const totalAmountDue = baseBalance + totalPenalties;
-
-  // Column T: Outstanding Balance
-  // Excel: = Total Amount Due
   const outstandingBalance = totalAmountDue;
 
   // Column U: Next Due Date
-  // Excel: MINIFS('Monthly Schedule'!$D:$D, 'Monthly Schedule'!$A:$A, A2, 'Monthly Schedule'!$H:$H, "<>PAID")
   let nextDueDate = '';
   for (const row of schedule) {
     if (row.payment_status !== SCHEDULE_STATUSES.PAID && row.due_date) {
@@ -117,7 +193,6 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
   }
 
   // Column V: Days Overdue
-  // Excel: IF(OR(A2="", U2="", T2<=0), "", MAX(0, TODAY() - U2))
   let daysOverdue = 0;
   if (nextDueDate && outstandingBalance > 0) {
     const diff = daysDifference(todayRef, nextDueDate);
@@ -125,18 +200,12 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
   }
 
   // Column W: Status
-  // Excel Priority:
-  // 1. IF(T2<=0, "PAID")
-  // 2. IF(P2>=2, "PENALTY - 2+ MISSED MONTHS")
-  // 3. IF(AND(I2<>"", TODAY()>I2, H2<=0), "DOWN PAYMENT OVERDUE")
-  // 4. IF(V2>0, "OVERDUE")
-  // 5. ELSE "ACTIVE"
   let status = ACCOUNT_STATUSES.ACTIVE;
   if (outstandingBalance <= 0) {
     status = ACCOUNT_STATUSES.PAID;
-  } else if (consecutiveMissed >= 2) {
+  } else if (outstandingPenalties > 0 || consecutiveMissed >= 2) {
     status = ACCOUNT_STATUSES.PENALTY;
-  } else if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && totalDpPaid <= 0) {
+  } else if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && totalDpPaid <= 0 && downPayment > 0) {
     status = ACCOUNT_STATUSES.DP_OVERDUE;
   } else if (daysOverdue > 0) {
     status = ACCOUNT_STATUSES.OVERDUE;
@@ -149,21 +218,23 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
     is_dp_paid: isDpFullyPaid ? 1 : 0,
     total_dp_paid: totalDpPaid,
     installments_paid: installmentsPaid,
-    total_paid: totalPaid,
+    total_paid: totalCollected,
+    total_principal_paid: totalPrincipalPaid,
     base_balance: baseBalance,
     dp_penalty: dpPenalty,
     consecutive_missed: consecutiveMissed,
     delayed_months_amount: delayedMonthsAmount,
-    ten_percent_delayed_penalty: tenPercentDelayedPenalty,
-    ten_percent_balance_penalty: tenPercentBalancePenalty,
-    ten_percent_penalty: tenPercentPenalty,
+    ten_percent_penalty: tenPercentPenaltyIncurred,
+    total_penalties_incurred: totalPenaltiesIncurred,
+    penalties_paid: penaltiesPaid,
+    penalties_balance: outstandingPenalties,
     total_penalties: totalPenalties,
     total_amount_due: totalAmountDue,
     outstanding_balance: outstandingBalance,
     next_due_date: nextDueDate,
     days_overdue: daysOverdue,
     status: status,
-    schedule: schedule // cached for views
+    schedule: schedule
   };
 }
 
@@ -174,10 +245,92 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
  * @returns {Object}
  */
 export function computePaymentDerived(payment, account) {
+  let monthCovered = payment.month_covered;
+  if (!monthCovered) {
+    if (payment.payment_type === 'Down Payment') {
+      monthCovered = 'Down Payment';
+    } else {
+      monthCovered = formatMonthCovered(payment.payment_date);
+    }
+  }
+
   return {
     ...payment,
     name: account?.name || '',
     due_date: account?.first_due_date || '',
-    month_covered: formatMonthCovered(payment.payment_date)
+    month_covered: monthCovered
+  };
+}
+
+/**
+ * Computes all months that were part of a 2+ consecutive missed streak.
+ * Guarantees that late penalties incurred for missed installments do not vanish when paid later.
+ */
+function computeLatePenaltyMonths(schedule, installmentPayments, monthlyExpected, todayRef) {
+  if (monthlyExpected <= 0 || !schedule || schedule.length === 0) {
+    return { lateMonthsCount: 0, penaltyAmount: 0 };
+  }
+
+  // Chronologically sort installment payments
+  const sortedPayments = [...installmentPayments].sort((a, b) => 
+    new Date(a.payment_date) - new Date(b.payment_date)
+  );
+
+  // Map month number -> date when that month was fully satisfied
+  const paidAtDates = {};
+  let runningAmort = 0;
+  let payIdx = 0;
+
+  for (let m = 1; m <= schedule.length; m++) {
+    const needed = m * monthlyExpected;
+    while (runningAmort < needed - 0.01 && payIdx < sortedPayments.length) {
+      const p = sortedPayments[payIdx++];
+      let amt = 0;
+      if (p.payment_type === 'Amortization + Penalty') {
+        const aPortion = Number(p.amortization_amount);
+        const total = Number(p.amount_paid) || 0;
+        const pPortion = Number(p.penalty_amount) || 0;
+        amt = !isNaN(aPortion) && aPortion > 0 ? aPortion : Math.max(0, total - pPortion);
+      } else {
+        amt = Number(p.amount_paid) || 0;
+      }
+      runningAmort += amt;
+      if (runningAmort >= needed - 0.01) {
+        paidAtDates[m] = p.payment_date;
+        break;
+      }
+    }
+    if (runningAmort < needed - 0.01) {
+      paidAtDates[m] = null; // Unpaid
+    }
+  }
+
+  const penalizedMonths = new Set();
+
+  for (let m = 2; m <= schedule.length; m++) {
+    const rowM = schedule[m - 1];
+    if (!rowM || !rowM.due_date || !isBeforeToday(rowM.due_date, todayRef)) {
+      continue;
+    }
+
+    const dueDateM = rowM.due_date;
+    const prevPaidDate = paidAtDates[m - 1];
+    const currPaidDate = paidAtDates[m];
+
+    // Was month m-1 unpaid when month m reached due date?
+    const prevUnpaidAtDueDateM = (!prevPaidDate || isBeforeToday(dueDateM, prevPaidDate));
+
+    // Was month m unpaid when month m reached due date?
+    const currUnpaidAtDueDateM = (!currPaidDate || !isBeforeToday(currPaidDate, dueDateM));
+
+    if (prevUnpaidAtDueDateM && currUnpaidAtDueDateM) {
+      penalizedMonths.add(m - 1);
+      penalizedMonths.add(m);
+    }
+  }
+
+  return {
+    lateMonthsCount: penalizedMonths.size,
+    penaltyAmount: Math.round(penalizedMonths.size * monthlyExpected * 0.10 * 100) / 100
   };
 }

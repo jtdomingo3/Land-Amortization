@@ -9,6 +9,10 @@ import {
   insertPayment,
   updatePayment as dbUpdatePayment,
   deletePayment as dbDeletePayment,
+  getPenalties,
+  insertPenalty as dbInsertPenalty,
+  waivePenalty as dbWaivePenalty,
+  deletePenalty as dbDeletePenalty,
   getExportLogs,
   addExportLog,
   resetToSampleData,
@@ -25,7 +29,9 @@ import {
   syncUpsertAccount,
   syncDeleteAccount,
   syncUpsertPayment,
-  syncDeletePayment
+  syncDeletePayment,
+  syncUpsertPenalty,
+  syncDeletePenalty
 } from '../services/supabaseSync.js';
 
 const AppContext = createContext(null);
@@ -62,6 +68,7 @@ export function AppProvider({ children }) {
 
   const [rawAccounts, setRawAccounts] = useState([]);
   const [rawPayments, setRawPayments] = useState([]);
+  const [rawPenalties, setRawPenalties] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboard, setDashboard] = useState({});
@@ -80,10 +87,10 @@ export function AppProvider({ children }) {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Recompute derived fields whenever rawAccounts or rawPayments change
-  const recompute = useCallback((accs, pays) => {
+  // Recompute derived fields whenever rawAccounts, rawPayments, or rawPenalties change
+  const recompute = useCallback((accs, pays, pens = []) => {
     const today = new Date();
-    const computedAccs = accs.map(a => computeAccountDerived(a, pays, today));
+    const computedAccs = accs.map(a => computeAccountDerived(a, pays, today, pens));
     const computedPays = pays.map(p => {
       const a = accs.find(acc => String(acc.account_id) === String(p.account_id));
       return computePaymentDerived(p, a);
@@ -108,15 +115,17 @@ export function AppProvider({ children }) {
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
-      const [accs, pays, logs] = await Promise.all([
+      const [accs, pays, pens, logs] = await Promise.all([
         getAccounts(),
         getPayments(),
+        getPenalties(),
         getExportLogs()
       ]);
       setRawAccounts(accs);
       setRawPayments(pays);
+      setRawPenalties(pens);
       setExportLogs(logs);
-      recompute(accs, pays);
+      recompute(accs, pays, pens);
       setError(null);
     } catch (err) {
       console.error('Failed to load data:', err);
@@ -325,6 +334,34 @@ export function AppProvider({ children }) {
     triggerAutoSync();
   };
 
+  const handleAddPenalty = async (penaltyData) => {
+    await dbInsertPenalty(penaltyData);
+    syncUpsertPenalty(penaltyData);
+    await refreshData();
+    triggerAutoSync();
+  };
+
+  const handleWaivePenalty = async (penaltyId, waivedAmount) => {
+    await dbWaivePenalty(penaltyId, waivedAmount);
+    const updated = rawPenalties.find(p => p.penalty_id === penaltyId);
+    if (updated) {
+      syncUpsertPenalty({
+        ...updated,
+        status: 'WAIVED',
+        waived_amount: waivedAmount !== undefined ? waivedAmount : updated.penalty_amount
+      });
+    }
+    await refreshData();
+    triggerAutoSync();
+  };
+
+  const handleDeletePenalty = async (penaltyId) => {
+    await dbDeletePenalty(penaltyId);
+    syncDeletePenalty(penaltyId);
+    await refreshData();
+    triggerAutoSync();
+  };
+
   const handleExportExcel = async (customFileName) => {
     const res = await saveWorkbookToDevice(rawAccounts, rawPayments, customFileName);
     if (res && res.success && !res.canceled) {
@@ -382,6 +419,7 @@ export function AppProvider({ children }) {
     toggleTheme,
     rawAccounts,
     rawPayments,
+    rawPenalties,
     accounts,
     payments,
     dashboard,
@@ -397,6 +435,9 @@ export function AppProvider({ children }) {
     addPayment: handleAddPayment,
     updatePayment: handleUpdatePayment,
     deletePayment: handleDeletePayment,
+    addPenalty: handleAddPenalty,
+    waivePenalty: handleWaivePenalty,
+    deletePenalty: handleDeletePenalty,
     refreshData,
     exportExcel: handleExportExcel,
     shareDrive: handleShareDrive,

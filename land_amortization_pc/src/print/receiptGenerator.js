@@ -34,8 +34,30 @@ export function calculateReceiptCoveredMonths(account, targetPayment, allPayment
     }];
   }
 
-  // Non-installment / Other payments (e.g. penalty fee)
-  if (targetPayment.payment_type && targetPayment.payment_type !== 'Installment') {
+  // Penalty-only payments
+  if (targetPayment.payment_type === 'Penalty') {
+    const paidAmount = Number(targetPayment.amount_paid) || 0;
+    return [{
+      receiptIndex: 1,
+      totalReceipts: 1,
+      monthNo: targetPayment.for_month_no || 0,
+      description: `Penalty Settlement${targetPayment.month_covered ? ` (${targetPayment.month_covered})` : ''}`,
+      dueDate: targetPayment.payment_date,
+      expectedAmount: paidAmount,
+      amountApplied: paidAmount,
+      status: 'PAID',
+      runningTotalPaid: Number(account.total_paid) || paidAmount,
+      remainingBalance: Number(account.outstanding_balance) || 0
+    }];
+  }
+
+  // INSTALLMENT & MONTHLY AMORTIZATION WATERFALL BREAKDOWN
+  const isAmortizationType = !targetPayment.payment_type ||
+    targetPayment.payment_type === 'Monthly Amortization' ||
+    targetPayment.payment_type === 'Installment' ||
+    targetPayment.payment_type === 'Amortization + Penalty';
+
+  if (!isAmortizationType) {
     const paidAmount = Number(targetPayment.amount_paid) || 0;
     return [{
       receiptIndex: 1,
@@ -51,10 +73,10 @@ export function calculateReceiptCoveredMonths(account, targetPayment, allPayment
     }];
   }
 
-  // INSTALLMENT PAYMENT WATERFALL BREAKDOWN
   // Filter all installment payments for this account and sort chronologically
+  const isInstallmentRecord = (p) => p.payment_type !== 'Down Payment' && p.payment_type !== 'Penalty';
   const accountInstallments = allPayments
-    .filter(p => String(p.account_id) === String(account.account_id) && (p.payment_type === 'Installment' || !p.payment_type))
+    .filter(p => String(p.account_id) === String(account.account_id) && isInstallmentRecord(p))
     .sort((a, b) => {
       const dateCmp = new Date(a.payment_date || 0) - new Date(b.payment_date || 0);
       if (dateCmp !== 0) return dateCmp;
@@ -67,10 +89,14 @@ export function calculateReceiptCoveredMonths(account, targetPayment, allPayment
     if (String(p.payment_id) === String(targetPayment.payment_id)) {
       break;
     }
-    priorPaid += (Number(p.amount_paid) || 0);
+    const amortPortion = p.amortization_amount !== undefined ? Number(p.amortization_amount) : Number(p.amount_paid);
+    priorPaid += (amortPortion || 0);
   }
 
-  const thisPaid = Number(targetPayment.amount_paid) || 0;
+  const thisAmort = targetPayment.amortization_amount !== undefined
+    ? Number(targetPayment.amortization_amount)
+    : (Number(targetPayment.amount_paid) || 0);
+  const thisPaid = thisAmort > 0 ? thisAmort : (Number(targetPayment.amount_paid) || 0);
   const currentTotalInstallments = priorPaid + thisPaid;
   const monthlyExpected = Number(account.monthly_amortization) || 0;
   const totalMonths = Number(account.num_of_months) || 120;
@@ -247,6 +273,12 @@ export function generateSingleReceiptHTML({
             <span class="doc-label">Payment Type:</span>
             <span class="doc-value">${payment.payment_type || 'Installment'}</span>
           </div>
+          ${payment.month_covered ? `
+          <div class="doc-row">
+            <span class="doc-label">For Month of:</span>
+            <span class="doc-value" style="font-weight: 700; color: #4338ca;">${payment.month_covered}</span>
+          </div>
+          ` : ''}
         </div>
 
         <div class="doc-info-box">
@@ -281,6 +313,7 @@ export function generateSingleReceiptHTML({
           <tr>
             <td>
               <strong>${receiptItem.description || payment.month_covered || 'Amortization Payment'}</strong>
+              ${payment.month_covered && !receiptItem.description.includes(payment.month_covered) ? `<div style="font-size: 0.72rem; color: #4338ca; font-weight: 600; margin-top: 2px;">For the month of: ${payment.month_covered}</div>` : ''}
               ${payment.remarks ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">Note: ${payment.remarks}</div>` : ''}
             </td>
             <td>${formatDate(receiptItem.dueDate || payment.payment_date)}</td>
@@ -292,9 +325,27 @@ export function generateSingleReceiptHTML({
               </span>
             </td>
           </tr>
+          ${Number(payment.penalty_amount) > 0 && payment.payment_type === 'Amortization + Penalty' ? `
+          <tr>
+            <td>
+              <strong>Late Payment Penalty Surcharge</strong>
+              <div style="font-size: 0.7rem; color: #b45309; margin-top: 2px;">Settlement of overdue penalty</div>
+            </td>
+            <td>${formatDate(payment.payment_date)}</td>
+            <td class="right mono">${formatCurrency(payment.penalty_amount)}</td>
+            <td class="right mono" style="font-weight: 700; color: #b45309;">${formatCurrency(payment.penalty_amount)}</td>
+            <td class="center">
+              <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; background: rgba(245,158,11,0.15); color: #b45309;">
+                SETTLED
+              </span>
+            </td>
+          </tr>
+          ` : ''}
           <tr class="total-row">
             <td colspan="3" style="text-transform: uppercase;">Total Received for this Receipt</td>
-            <td class="right mono" style="font-size: 0.88rem; font-weight: 800; color: #047857;">${formatCurrency(receiptItem.amountApplied)}</td>
+            <td class="right mono" style="font-size: 0.88rem; font-weight: 800; color: #047857;">
+              ${formatCurrency(Number(payment.penalty_amount) > 0 && payment.payment_type === 'Amortization + Penalty' ? (Number(receiptItem.amountApplied) + Number(payment.penalty_amount)) : receiptItem.amountApplied)}
+            </td>
             <td></td>
           </tr>
         </tbody>

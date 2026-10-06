@@ -17,11 +17,12 @@ import {
   Table as TableIcon,
   LayoutGrid,
   FileText,
-  MapPin
+  MapPin,
+  Trash2
 } from 'lucide-react';
 
 export function AccountsPage() {
-  const { accounts, addAccount, resetSample } = useApp();
+  const { accounts, addAccount, resetSample, deleteAccount } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('id-asc');
@@ -70,6 +71,14 @@ export function AccountsPage() {
         }
       });
   }, [accounts, searchQuery, statusFilter, sortBy]);
+
+  const handleDeleteAccount = async (account, e) => {
+    if (e) e.stopPropagation();
+    const confirmText = `Are you sure you want to permanently delete Account #${account.account_id} (${account.name})?\n\nAll associated payments and records will be deleted locally and in the Supabase cloud database.`;
+    if (window.confirm(confirmText)) {
+      await deleteAccount(account.account_id);
+    }
+  };
 
   // If viewing detail of a specific account, show detail view
   if (viewingAccountId) {
@@ -250,16 +259,26 @@ export function AccountsPage() {
                       <StatusBadge status={account.status} />
                     </td>
                     <td style={{ textAlign: 'right', paddingRight: 16 }}>
-                      <button
-                        className="btn btn-secondary btn-sm table-action-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewingAccountId(account.account_id);
-                        }}
-                      >
-                        <FileText size={14} />
-                        <span>View Ledger</span>
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          className="btn btn-secondary btn-sm table-action-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingAccountId(account.account_id);
+                          }}
+                        >
+                          <FileText size={14} />
+                          <span>View Ledger</span>
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm table-action-btn action-icon-btn"
+                          style={{ padding: '6px 8px' }}
+                          onClick={(e) => handleDeleteAccount(account, e)}
+                          title="Delete Customer Account"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -288,7 +307,17 @@ export function AccountsPage() {
                       <span>{account.land_area_sqm || 0} sqm</span>
                     </div>
                   </div>
-                  <StatusBadge status={account.status} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusBadge status={account.status} />
+                    <button
+                      className="btn btn-danger btn-xs action-icon-btn"
+                      style={{ padding: '4px 6px', opacity: 0.85 }}
+                      onClick={(e) => handleDeleteAccount(account, e)}
+                      title="Delete Customer Account"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="account-financials">

@@ -16,32 +16,62 @@ export function computeMonthlySchedule(account, payments = [], todayRef = new Da
   // Filter installment payments for this account
   const installmentPayments = payments.filter(
     p => String(p.account_id) === String(account.account_id) && 
-         (p.payment_type === 'Installment' || p.payment_type === undefined)
-  );
-
-  const totalInstallmentsPaid = installmentPayments.reduce(
-    (sum, p) => sum + (Number(p.amount_paid) || 0), 0
+         (p.payment_type === 'Installment' || 
+          p.payment_type === 'Monthly Amortization' || 
+          p.payment_type === 'Amortization + Penalty' || 
+          p.payment_type === undefined)
   );
 
   const numOfMonths = Number(account.num_of_months) || 120;
   const monthlyExpected = Number(account.monthly_amortization) || 0;
   const firstDueDate = account.first_due_date;
 
+  // Separate targeted payments from general pool payments
+  const targetedByMonth = {};
+  let generalPool = 0;
+
+  for (const p of installmentPayments) {
+    let amortPaid = 0;
+    if (p.payment_type === 'Amortization + Penalty') {
+      const aPortion = Number(p.amortization_amount);
+      const total = Number(p.amount_paid) || 0;
+      const pPortion = Number(p.penalty_amount) || 0;
+      amortPaid = !isNaN(aPortion) && aPortion > 0 ? aPortion : Math.max(0, total - pPortion);
+    } else {
+      amortPaid = Number(p.amount_paid) || 0;
+    }
+
+    const mNo = Number(p.for_month_no);
+    if (mNo && mNo >= 1 && mNo <= numOfMonths) {
+      targetedByMonth[mNo] = (targetedByMonth[mNo] || 0) + amortPaid;
+    } else {
+      generalPool += amortPaid;
+    }
+  }
+
   const schedule = [];
-  let cumulativeExpectedPrior = 0;
+  let remainingGeneralPool = generalPool;
   let runningConsecutiveMissed = 0;
 
   for (let monthNo = 1; monthNo <= numOfMonths; monthNo++) {
     const dueDate = firstDueDate ? addMonthsEdate(firstDueDate, monthNo - 1) : '';
     const expectedAmortization = monthlyExpected;
 
-    // Excel: F = MAX(0, MIN(expected, totalInstallments - priorCumulativeExpected))
-    const availableForThisMonth = totalInstallmentsPaid - cumulativeExpectedPrior;
-    const amountApplied = Math.max(0, Math.min(expectedAmortization, availableForThisMonth));
+    // Apply targeted payment if any, plus waterfall advance from general pool
+    const targetedForMonth = targetedByMonth[monthNo] || 0;
+    const neededFromGeneral = Math.max(0, expectedAmortization - targetedForMonth);
+    const fromGeneral = Math.max(0, Math.min(neededFromGeneral, remainingGeneralPool));
+    remainingGeneralPool -= fromGeneral;
 
-    // Excel: G = MAX(0, totalInstallments - (priorCumulativeExpected + expected))
-    const cumulativeExpectedCurrent = cumulativeExpectedPrior + expectedAmortization;
-    const advanceRemaining = Math.max(0, totalInstallmentsPaid - cumulativeExpectedCurrent);
+    // Total applied for this month (capped at expected amortization)
+    const amountApplied = Math.min(expectedAmortization, targetedForMonth + fromGeneral);
+
+    // Any excess targeted amount spills over to general pool
+    if (targetedForMonth > expectedAmortization) {
+      remainingGeneralPool += (targetedForMonth - expectedAmortization);
+    }
+
+    const advanceRemaining = Math.max(0, remainingGeneralPool);
 
     // Payment Status:
     // Excel: IF(F >= E, "PAID", IF(AND(F > 0, F < E), "PARTIAL", IF(D < TODAY(), "OVERDUE", "DUE")))
@@ -85,8 +115,6 @@ export function computeMonthlySchedule(account, payments = [], todayRef = new Da
       remarks: remarks,
       consecutive_missed: runningConsecutiveMissed
     });
-
-    cumulativeExpectedPrior = cumulativeExpectedCurrent;
   }
 
   return schedule;

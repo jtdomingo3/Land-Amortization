@@ -2,6 +2,8 @@ import {
   CREATE_TABLE_ACCOUNTS,
   CREATE_TABLE_PAYMENTS,
   CREATE_INDEX_PAYMENTS,
+  CREATE_TABLE_PENALTIES,
+  CREATE_INDEX_PENALTIES,
   CREATE_TABLE_SETTINGS,
   CREATE_TABLE_EXPORT_LOG
 } from './queries.js';
@@ -120,9 +122,46 @@ export const INITIAL_PAYMENTS = getSampleData().payments;
 const WEB_STORAGE_KEYS = {
   ACCOUNTS: 'land_amortization_accounts',
   PAYMENTS: 'land_amortization_payments',
+  PENALTIES: 'land_amortization_penalties',
   SETTINGS: 'land_amortization_settings',
   EXPORT_LOG: 'land_amortization_export_log'
 };
+
+const TOMBSTONE_KEYS = {
+  DELETED_ACCOUNTS: 'land_amortization_deleted_accounts',
+  DELETED_PAYMENTS: 'land_amortization_deleted_payments'
+};
+
+export function recordDeletedAccount(accountId) {
+  try {
+    const list = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]');
+    if (!list.includes(String(accountId))) {
+      list.push(String(accountId));
+      localStorage.setItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS, JSON.stringify(list));
+    }
+  } catch (_) {}
+}
+
+export function recordDeletedPayment(paymentId) {
+  try {
+    const list = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]');
+    if (!list.includes(String(paymentId))) {
+      list.push(String(paymentId));
+      localStorage.setItem(TOMBSTONE_KEYS.DELETED_PAYMENTS, JSON.stringify(list));
+    }
+  } catch (_) {}
+}
+
+export function getDeletedRecords() {
+  try {
+    return {
+      deletedAccounts: JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]'),
+      deletedPayments: JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]')
+    };
+  } catch (_) {
+    return { deletedAccounts: [], deletedPayments: [] };
+  }
+}
 
 function getWebData(key, defaultVal = []) {
   try {
@@ -150,7 +189,7 @@ export async function initDatabase() {
     console.log('[Database] Initializing Electron Native SQLite via IPC...');
     isWebFallback = false;
     try {
-      // Execute any startup verification
+      // Execute any startup verification & migrations
       await window.electronAPI.sqlite.exec(`
         CREATE TABLE IF NOT EXISTS land_accounts (
           account_id            INTEGER PRIMARY KEY,
@@ -171,19 +210,40 @@ export async function initDatabase() {
         );
 
         CREATE TABLE IF NOT EXISTS payments (
-          payment_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+          payment_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id          INTEGER NOT NULL,
+          payment_date        TEXT NOT NULL,
+          payment_type        TEXT NOT NULL DEFAULT 'Monthly Amortization',
+          amount_paid         REAL NOT NULL,
+          receipt_no          TEXT,
+          payment_method      TEXT DEFAULT 'Cash',
+          remarks             TEXT,
+          month_covered       TEXT,
+          for_month_no        INTEGER,
+          amortization_amount REAL DEFAULT 0,
+          penalty_amount      REAL DEFAULT 0,
+          created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(account_id, payment_type);
+
+        CREATE TABLE IF NOT EXISTS penalties (
+          penalty_id     INTEGER PRIMARY KEY AUTOINCREMENT,
           account_id     INTEGER NOT NULL,
-          payment_date   TEXT NOT NULL,
-          payment_type   TEXT NOT NULL DEFAULT 'Installment',
-          amount_paid    REAL NOT NULL,
-          receipt_no     TEXT,
-          payment_method TEXT DEFAULT 'Cash',
+          penalty_type   TEXT NOT NULL,
+          month_no       INTEGER,
+          month_covered  TEXT,
+          amount         REAL NOT NULL,
+          assessed_date  TEXT NOT NULL,
+          status         TEXT DEFAULT 'UNPAID',
+          amount_paid    REAL DEFAULT 0,
           remarks        TEXT,
           created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
         );
 
-        CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(account_id, payment_type);
+        CREATE INDEX IF NOT EXISTS idx_penalties_account ON penalties(account_id, status);
 
         CREATE TABLE IF NOT EXISTS app_settings (
           key   TEXT PRIMARY KEY,
@@ -199,11 +259,27 @@ export async function initDatabase() {
           created_at        TEXT DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      // Safe migrations for existing payments table columns
+      const migrations = [
+        'ALTER TABLE payments ADD COLUMN month_covered TEXT;',
+        'ALTER TABLE payments ADD COLUMN for_month_no INTEGER;',
+        'ALTER TABLE payments ADD COLUMN amortization_amount REAL DEFAULT 0;',
+        'ALTER TABLE payments ADD COLUMN penalty_amount REAL DEFAULT 0;',
+        'ALTER TABLE land_accounts ADD COLUMN is_dp_paid INTEGER DEFAULT 0;'
+      ];
+      for (const mig of migrations) {
+        try {
+          await window.electronAPI.sqlite.exec(mig);
+        } catch (_) {
+          // Column already exists, safe to ignore
+        }
+      }
+
       console.log('[Database] Electron SQLite initialized successfully.');
       return true;
     } catch (e) {
       console.error('[Database] Failed to verify Electron SQLite schemas:', e);
-      // Still proceed with Electron
       return true;
     }
   }
@@ -224,9 +300,15 @@ export async function initDatabase() {
           tx.executeSql(CREATE_TABLE_ACCOUNTS);
           tx.executeSql(CREATE_TABLE_PAYMENTS);
           tx.executeSql(CREATE_INDEX_PAYMENTS);
+          tx.executeSql(CREATE_TABLE_PENALTIES);
+          tx.executeSql(CREATE_INDEX_PENALTIES);
           tx.executeSql(CREATE_TABLE_SETTINGS);
           tx.executeSql(CREATE_TABLE_EXPORT_LOG);
           tx.executeSql('ALTER TABLE land_accounts ADD COLUMN is_dp_paid INTEGER DEFAULT 0;', [], () => {}, () => false);
+          tx.executeSql('ALTER TABLE payments ADD COLUMN month_covered TEXT;', [], () => {}, () => false);
+          tx.executeSql('ALTER TABLE payments ADD COLUMN for_month_no INTEGER;', [], () => {}, () => false);
+          tx.executeSql('ALTER TABLE payments ADD COLUMN amortization_amount REAL DEFAULT 0;', [], () => {}, () => false);
+          tx.executeSql('ALTER TABLE payments ADD COLUMN penalty_amount REAL DEFAULT 0;', [], () => {}, () => false);
         }, (err) => {
           console.error('Database migration error:', err);
           reject(err);
@@ -254,9 +336,12 @@ function setupWebStorage() {
   if (accounts === null) {
     setWebData(WEB_STORAGE_KEYS.ACCOUNTS, []);
     setWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, []);
     setWebData(WEB_STORAGE_KEYS.SETTINGS, { theme: 'light', currency: 'PHP' });
     setWebData(WEB_STORAGE_KEYS.EXPORT_LOG, []);
     console.log('Web Storage initialized clean with 0 accounts.');
+  } else if (getWebData(WEB_STORAGE_KEYS.PENALTIES, null) === null) {
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, []);
   }
 }
 
@@ -416,6 +501,7 @@ export async function updateAccount(acc) {
 }
 
 export async function deleteAccount(accountId) {
+  recordDeletedAccount(accountId);
   if (isWebFallback) {
     let accounts = getWebData(WEB_STORAGE_KEYS.ACCOUNTS, []);
     accounts = accounts.filter(a => Number(a.account_id) !== Number(accountId));
@@ -424,9 +510,14 @@ export async function deleteAccount(accountId) {
     let payments = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
     payments = payments.filter(p => Number(p.account_id) !== Number(accountId));
     setWebData(WEB_STORAGE_KEYS.PAYMENTS, payments);
+
+    let penalties = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    penalties = penalties.filter(p => Number(p.account_id) !== Number(accountId));
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, penalties);
     return true;
   }
 
+  await runSql('DELETE FROM penalties WHERE account_id = ?', [accountId]);
   await runSql('DELETE FROM payments WHERE account_id = ?', [accountId]);
   await runSql('DELETE FROM land_accounts WHERE account_id = ?', [accountId]);
   return true;
@@ -455,14 +546,35 @@ export async function getPaymentsByAccount(accountId) {
 }
 
 export async function insertPayment(p) {
+  const pType = p.payment_type || 'Monthly Amortization';
+  const totalAmount = Number(p.amount_paid) || 0;
+  let amortAmount = p.amortization_amount !== undefined ? Number(p.amortization_amount) : 0;
+  let penAmount = p.penalty_amount !== undefined ? Number(p.penalty_amount) : 0;
+
+  if (pType === 'Penalty') {
+    penAmount = totalAmount;
+    amortAmount = 0;
+  } else if (pType === 'Monthly Amortization' || pType === 'Installment') {
+    amortAmount = totalAmount;
+    penAmount = 0;
+  } else if (pType === 'Amortization + Penalty') {
+    if (amortAmount === 0 && penAmount === 0) {
+      amortAmount = totalAmount;
+    }
+  }
+
   const payment = {
     account_id: Number(p.account_id),
     payment_date: p.payment_date,
-    payment_type: p.payment_type || 'Installment',
-    amount_paid: Number(p.amount_paid) || 0,
+    payment_type: pType,
+    amount_paid: totalAmount,
     receipt_no: p.receipt_no || '',
     payment_method: p.payment_method || 'Cash',
-    remarks: p.remarks || ''
+    remarks: p.remarks || '',
+    month_covered: p.month_covered || '',
+    for_month_no: p.for_month_no !== null && p.for_month_no !== undefined ? Number(p.for_month_no) : null,
+    amortization_amount: amortAmount,
+    penalty_amount: penAmount
   };
 
   if (isWebFallback) {
@@ -476,26 +588,45 @@ export async function insertPayment(p) {
 
   const sql = `
     INSERT INTO payments (
-      account_id, payment_date, payment_type, amount_paid, receipt_no, payment_method, remarks
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      account_id, payment_date, payment_type, amount_paid, receipt_no, payment_method, remarks,
+      month_covered, for_month_no, amortization_amount, penalty_amount
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const res = await runSql(sql, [
     payment.account_id, payment.payment_date, payment.payment_type,
-    payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks
+    payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks,
+    payment.month_covered, payment.for_month_no, payment.amortization_amount, payment.penalty_amount
   ]);
   return { ...payment, payment_id: res.insertId };
 }
 
 export async function updatePayment(p) {
   const paymentId = Number(p.payment_id);
+  const pType = p.payment_type || 'Monthly Amortization';
+  const totalAmount = Number(p.amount_paid) || 0;
+  let amortAmount = p.amortization_amount !== undefined ? Number(p.amortization_amount) : 0;
+  let penAmount = p.penalty_amount !== undefined ? Number(p.penalty_amount) : 0;
+
+  if (pType === 'Penalty') {
+    penAmount = totalAmount;
+    amortAmount = 0;
+  } else if (pType === 'Monthly Amortization' || pType === 'Installment') {
+    amortAmount = totalAmount;
+    penAmount = 0;
+  }
+
   const payment = {
     account_id: Number(p.account_id),
     payment_date: p.payment_date,
-    payment_type: p.payment_type || 'Installment',
-    amount_paid: Number(p.amount_paid) || 0,
+    payment_type: pType,
+    amount_paid: totalAmount,
     receipt_no: p.receipt_no || '',
     payment_method: p.payment_method || 'Cash',
-    remarks: p.remarks || ''
+    remarks: p.remarks || '',
+    month_covered: p.month_covered || '',
+    for_month_no: p.for_month_no !== null && p.for_month_no !== undefined ? Number(p.for_month_no) : null,
+    amortization_amount: amortAmount,
+    penalty_amount: penAmount
   };
 
   if (isWebFallback) {
@@ -510,17 +641,21 @@ export async function updatePayment(p) {
   const sql = `
     UPDATE payments SET
       account_id = ?, payment_date = ?, payment_type = ?, amount_paid = ?,
-      receipt_no = ?, payment_method = ?, remarks = ?
+      receipt_no = ?, payment_method = ?, remarks = ?,
+      month_covered = ?, for_month_no = ?, amortization_amount = ?, penalty_amount = ?
     WHERE payment_id = ?
   `;
   await runSql(sql, [
     payment.account_id, payment.payment_date, payment.payment_type,
-    payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks, paymentId
+    payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks,
+    payment.month_covered, payment.for_month_no, payment.amortization_amount, payment.penalty_amount,
+    paymentId
   ]);
   return { ...payment, payment_id: paymentId };
 }
 
 export async function deletePayment(paymentId) {
+  recordDeletedPayment(paymentId);
   if (isWebFallback) {
     let list = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
     list = list.filter(p => Number(p.payment_id) !== Number(paymentId));
@@ -528,6 +663,121 @@ export async function deletePayment(paymentId) {
     return true;
   }
   await runSql('DELETE FROM payments WHERE payment_id = ?', [paymentId]);
+  return true;
+}
+
+// ============================================
+// PENALTY OPERATIONS
+// ============================================
+
+export async function getPenalties(accountId = null) {
+  if (isWebFallback) {
+    const list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    return accountId ? list.filter(p => String(p.account_id) === String(accountId)) : list;
+  }
+  if (accountId) {
+    const res = await runSql('SELECT * FROM penalties WHERE account_id = ? ORDER BY assessed_date ASC, penalty_id ASC', [accountId]);
+    return res.rows;
+  }
+  const res = await runSql('SELECT * FROM penalties ORDER BY assessed_date ASC, penalty_id ASC');
+  return res.rows;
+}
+
+export async function insertPenalty(p) {
+  const penalty = {
+    account_id: Number(p.account_id),
+    penalty_type: p.penalty_type || '10% Late Penalty',
+    month_no: p.month_no ? Number(p.month_no) : null,
+    month_covered: p.month_covered || '',
+    amount: Number(p.amount) || 0,
+    assessed_date: p.assessed_date || new Date().toISOString().substring(0, 10),
+    status: p.status || 'UNPAID',
+    amount_paid: Number(p.amount_paid) || 0,
+    remarks: p.remarks || ''
+  };
+
+  if (isWebFallback) {
+    const list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    const nextId = list.length > 0 ? Math.max(...list.map(item => item.penalty_id || 0)) + 1 : 1;
+    const newPenalty = { ...penalty, penalty_id: nextId };
+    list.push(newPenalty);
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, list);
+    return newPenalty;
+  }
+
+  const sql = `
+    INSERT INTO penalties (
+      account_id, penalty_type, month_no, month_covered, amount, assessed_date, status, amount_paid, remarks
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  const res = await runSql(sql, [
+    penalty.account_id, penalty.penalty_type, penalty.month_no, penalty.month_covered,
+    penalty.amount, penalty.assessed_date, penalty.status, penalty.amount_paid, penalty.remarks
+  ]);
+  return { ...penalty, penalty_id: res.insertId };
+}
+
+export async function updatePenalty(p) {
+  const penaltyId = Number(p.penalty_id);
+  const penalty = {
+    account_id: Number(p.account_id),
+    penalty_type: p.penalty_type,
+    month_no: p.month_no ? Number(p.month_no) : null,
+    month_covered: p.month_covered || '',
+    amount: Number(p.amount) || 0,
+    assessed_date: p.assessed_date,
+    status: p.status || 'UNPAID',
+    amount_paid: Number(p.amount_paid) || 0,
+    remarks: p.remarks || ''
+  };
+
+  if (isWebFallback) {
+    const list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    const idx = list.findIndex(item => Number(item.penalty_id) === penaltyId);
+    if (idx === -1) throw new Error('Penalty not found');
+    list[idx] = { ...list[idx], ...penalty };
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, list);
+    return { ...penalty, penalty_id: penaltyId };
+  }
+
+  const sql = `
+    UPDATE penalties SET
+      account_id = ?, penalty_type = ?, month_no = ?, month_covered = ?,
+      amount = ?, assessed_date = ?, status = ?, amount_paid = ?, remarks = ?
+    WHERE penalty_id = ?
+  `;
+  await runSql(sql, [
+    penalty.account_id, penalty.penalty_type, penalty.month_no, penalty.month_covered,
+    penalty.amount, penalty.assessed_date, penalty.status, penalty.amount_paid, penalty.remarks,
+    penaltyId
+  ]);
+  return { ...penalty, penalty_id: penaltyId };
+}
+
+export async function waivePenalty(penaltyId, remarks = 'Waived by management') {
+  if (isWebFallback) {
+    const list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    const idx = list.findIndex(item => Number(item.penalty_id) === Number(penaltyId));
+    if (idx !== -1) {
+      list[idx].status = 'WAIVED';
+      list[idx].remarks = (list[idx].remarks ? list[idx].remarks + ' | ' : '') + remarks;
+      setWebData(WEB_STORAGE_KEYS.PENALTIES, list);
+      return list[idx];
+    }
+    return null;
+  }
+  await runSql("UPDATE penalties SET status = 'WAIVED', remarks = COALESCE(remarks || ' | ', '') || ? WHERE penalty_id = ?", [remarks, penaltyId]);
+  return true;
+}
+
+export async function deletePenalty(penaltyId) {
+  if (isWebFallback) {
+    let list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    list = list.filter(p => Number(p.penalty_id) !== Number(penaltyId));
+    setWebData(WEB_STORAGE_KEYS.PENALTIES, list);
+    return true;
+  }
+  await runSql('DELETE FROM penalties WHERE penalty_id = ?', [penaltyId]);
   return true;
 }
 

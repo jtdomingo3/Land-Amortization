@@ -1,6 +1,27 @@
-export const PAYMENT_TYPES = ['Installment', 'Down Payment', 'Other'];
+export const PAYMENT_TYPES = [
+  'Monthly Amortization',
+  'Penalty',
+  'Amortization + Penalty',
+  'Down Payment',
+  'Installment',
+  'Other'
+];
 
-export const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'G-Cash', 'Check', 'Other'];
+export const PAYMENT_METHODS = [
+  'Cash',
+  'Bank Transfer',
+  'Check',
+  'GCash',
+  'Maya',
+  'Other'
+];
+
+export const PENALTY_STATUSES = {
+  UNPAID: 'UNPAID',
+  PARTIAL: 'PARTIAL',
+  PAID: 'PAID',
+  WAIVED: 'WAIVED'
+};
 
 export const ACCOUNT_STATUSES = {
   PAID: 'PAID',

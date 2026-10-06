@@ -170,6 +170,11 @@ export function PaymentsPage() {
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--accent-emerald-light)' }}>
                     {formatCurrency(p.amount_paid)}
                   </div>
+                  {Number(p.penalty_amount) > 0 && (
+                    <div style={{ fontSize: '0.66rem', color: 'var(--accent-amber)', marginTop: 1 }}>
+                      Penalty: {formatCurrency(p.penalty_amount)}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
                     <span style={{
                       background: 'var(--bg-surface)',
@@ -202,9 +207,14 @@ export function PaymentsPage() {
                 fontSize: '0.74rem',
                 color: 'var(--text-muted)'
               }}>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{formatDate(p.payment_date)}</span>
                   {p.receipt_no && <span>• OR: <strong style={{ color: 'var(--text-primary)' }}>{p.receipt_no}</strong></span>}
+                  {p.month_covered && (
+                    <span style={{ color: 'var(--accent-indigo)', fontWeight: 600 }}>
+                      • For: {p.month_covered}
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: 6 }}>

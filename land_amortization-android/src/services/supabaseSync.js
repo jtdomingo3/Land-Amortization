@@ -5,7 +5,8 @@ import {
   insertAccount,
   updateAccount,
   insertPayment,
-  updatePayment
+  updatePayment,
+  getDeletedRecords
 } from '../db/database.js';
 
 const SUPABASE_CONFIG_STORAGE_KEY = 'land_amortization_supabase_config';
@@ -302,6 +303,10 @@ export async function syncWithSupabase() {
         receipt_no: p.receipt_no || null,
         payment_method: p.payment_method || 'Cash',
         remarks: p.remarks || null,
+        month_covered: p.month_covered || null,
+        for_month_no: p.for_month_no || null,
+        amortization_amount: p.amortization_amount !== undefined ? p.amortization_amount : (p.payment_type === 'Penalty' ? 0 : p.amount_paid),
+        penalty_amount: p.penalty_amount || (p.payment_type === 'Penalty' ? p.amount_paid : 0),
         updated_at: new Date().toISOString()
       }));
 
@@ -314,19 +319,36 @@ export async function syncWithSupabase() {
       }
     }
 
-    // 5. Pull cloud accounts that don't exist locally
+    // 5. Handle deleted items tombstones & prevent resurrection
+    const { deletedAccounts = [], deletedPayments = [] } = getDeletedRecords();
+    const deletedAccSet = new Set(deletedAccounts.map(String));
+    const deletedPaySet = new Set(deletedPayments.map(String));
+
+    for (const dAccId of deletedAccSet) {
+      try {
+        await client.from('land_payments').delete().eq('account_id', dAccId);
+        await client.from('land_accounts').delete().eq('account_id', dAccId);
+      } catch (_) {}
+    }
+    for (const dPayId of deletedPaySet) {
+      try {
+        await client.from('land_payments').delete().eq('payment_id', dPayId);
+      } catch (_) {}
+    }
+
+    // 6. Pull cloud accounts that don't exist locally and are NOT deleted
     const localAccIds = new Set(localAccounts.map(a => String(a.account_id)));
     for (const remAcc of (remoteAccounts || [])) {
-      if (!localAccIds.has(String(remAcc.account_id))) {
+      if (!localAccIds.has(String(remAcc.account_id)) && !deletedAccSet.has(String(remAcc.account_id))) {
         await insertAccount(remAcc);
         pulledAccounts++;
       }
     }
 
-    // 6. Pull cloud payments that don't exist locally
+    // 7. Pull cloud payments that don't exist locally and are NOT deleted
     const localPayIds = new Set(localPayments.map(p => String(p.payment_id)));
     for (const remPay of (remotePayments || [])) {
-      if (!localPayIds.has(String(remPay.payment_id))) {
+      if (!localPayIds.has(String(remPay.payment_id)) && !deletedPaySet.has(String(remPay.payment_id)) && !deletedAccSet.has(String(remPay.account_id))) {
         await insertPayment(remPay);
         pulledPayments++;
       }
@@ -393,11 +415,13 @@ export async function syncDeleteAccount(accountId) {
   if (!client) return;
 
   try {
+    try { await client.from('land_payments').delete().eq('account_id', accountId); } catch (_) {}
+    try { await client.from('land_penalties').delete().eq('account_id', accountId); } catch (_) {}
     await client.from('land_accounts').delete().eq('account_id', accountId);
     const now = new Date().toISOString();
     saveSupabaseConfig({ lastSyncedAt: now });
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
-    console.log('[Cloud Sync] Auto-deleted account from Supabase:', accountId);
+    console.log('[Cloud Sync] Auto-deleted account and payments from Supabase:', accountId);
   } catch (err) {
     console.warn('[Cloud Sync] Auto-delete account deferred:', err.message);
   }
@@ -421,6 +445,10 @@ export async function syncUpsertPayment(payment) {
       receipt_no: payment.receipt_no || null,
       payment_method: payment.payment_method || 'Cash',
       remarks: payment.remarks || null,
+      month_covered: payment.month_covered || null,
+      for_month_no: payment.for_month_no || null,
+      amortization_amount: payment.amortization_amount !== undefined ? payment.amortization_amount : (payment.payment_type === 'Penalty' ? 0 : payment.amount_paid),
+      penalty_amount: payment.penalty_amount || (payment.payment_type === 'Penalty' ? payment.amount_paid : 0),
       updated_at: new Date().toISOString()
     };
     await client.from('land_payments').upsert(clean, { onConflict: 'payment_id' });
@@ -451,3 +479,55 @@ export async function syncDeletePayment(paymentId) {
     console.warn('[Cloud Sync] Auto-delete payment deferred:', err.message);
   }
 }
+
+/**
+ * Automatically sync a created/updated penalty to Supabase if online
+ */
+export async function syncUpsertPenalty(penalty) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    const clean = {
+      penalty_id: penalty.penalty_id,
+      account_id: penalty.account_id,
+      month_no: penalty.month_no,
+      month_name: penalty.month_name || null,
+      due_date: penalty.due_date || null,
+      penalty_amount: penalty.penalty_amount,
+      penalty_reason: penalty.penalty_reason || null,
+      status: penalty.status || 'UNPAID',
+      paid_amount: penalty.paid_amount || 0,
+      waived_amount: penalty.waived_amount || 0,
+      created_at: penalty.created_at || new Date().toISOString()
+    };
+    await client.from('land_penalties').upsert(clean, { onConflict: 'penalty_id' });
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
+    console.log('[Cloud Sync] Auto-synced penalty to Supabase:', penalty.penalty_id);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-sync penalty deferred (optional table):', err.message);
+  }
+}
+
+/**
+ * Automatically delete a penalty from Supabase if online
+ */
+export async function syncDeletePenalty(penaltyId) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    await client.from('land_penalties').delete().eq('penalty_id', penaltyId);
+    const now = new Date().toISOString();
+    saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
+    console.log('[Cloud Sync] Auto-deleted penalty from Supabase:', penaltyId);
+  } catch (err) {
+    console.warn('[Cloud Sync] Auto-delete penalty deferred:', err.message);
+  }
+}
+

@@ -168,6 +168,7 @@ export function PaymentsPage() {
                 <th>Buyer Name</th>
                 <th>Account ID</th>
                 <th>Payment Type</th>
+                <th>Month Covered</th>
                 <th>Method</th>
                 <th style={{ textAlign: 'right' }}>Amount Paid</th>
                 <th>Remarks</th>
@@ -193,9 +194,21 @@ export function PaymentsPage() {
                         {p.payment_type}
                       </span>
                     </td>
+                    <td className="cell-muted" style={{ fontSize: '0.78rem' }}>
+                      {p.month_covered ? (
+                        <span style={{ color: 'var(--accent-indigo)', fontWeight: 600 }}>{p.month_covered}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="cell-muted">{p.payment_method || 'Cash'}</td>
                     <td className="cell-mono font-bold text-emerald" style={{ textAlign: 'right' }}>
-                      {formatCurrency(p.amount_paid)}
+                      <div>{formatCurrency(p.amount_paid)}</div>
+                      {Number(p.penalty_amount) > 0 && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--accent-amber)', fontWeight: 'normal' }}>
+                          Penalty: {formatCurrency(p.penalty_amount)}
+                        </div>
+                      )}
                     </td>
                     <td className="cell-muted cell-truncate" style={{ maxWidth: 180 }}>
                       {p.remarks || '—'}

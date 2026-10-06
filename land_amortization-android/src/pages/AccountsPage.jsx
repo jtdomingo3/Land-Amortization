@@ -13,11 +13,12 @@ import {
   ChevronRight,
   Clock,
   Calendar,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Trash2
 } from 'lucide-react';
 
 export function AccountsPage() {
-  const { accounts, addAccount, resetSample } = useApp();
+  const { accounts, addAccount, resetSample, deleteAccount } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('id-asc');
@@ -65,6 +66,14 @@ export function AccountsPage() {
         }
       });
   }, [accounts, searchQuery, statusFilter, sortBy]);
+
+  const handleDeleteAccount = async (account, e) => {
+    if (e) e.stopPropagation();
+    const confirmText = `Are you sure you want to permanently delete Account #${account.account_id} (${account.name})?\n\nAll associated payments and records will be deleted locally and in the Supabase cloud database.`;
+    if (window.confirm(confirmText)) {
+      await deleteAccount(account.account_id);
+    }
+  };
 
   // If viewing detail of a specific account, show detail view
   if (viewingAccountId) {
@@ -202,7 +211,17 @@ export function AccountsPage() {
                       <span>{account.land_area_sqm || 0} sqm</span>
                     </div>
                   </div>
-                  <StatusBadge status={account.status} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusBadge status={account.status} />
+                    <button
+                      className="btn btn-danger btn-xs action-icon-btn"
+                      style={{ padding: '4px 6px', opacity: 0.85 }}
+                      onClick={(e) => handleDeleteAccount(account, e)}
+                      title="Delete Customer Account"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="account-financials">
