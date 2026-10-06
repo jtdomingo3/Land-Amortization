@@ -98,7 +98,7 @@ export function computeAccountDerived(account, payments = [], todayRef = new Dat
 
   if (savedDpPenalty) {
     dpPenalty = Number(savedDpPenalty.amount) || 0;
-  } else if (agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && downPayment > 0) {
+  } else if (!isDpFullyPaid && agreedDpDue && isBeforeToday(agreedDpDue, todayRef) && downPayment > 0) {
     // Was DP paid on time?
     const onTimeDp = dpPayments.filter(p => !isBeforeToday(agreedDpDue, p.payment_date));
     const onTimePaid = onTimeDp.reduce((s, p) => s + (Number(p.amount_paid) || 0), 0);

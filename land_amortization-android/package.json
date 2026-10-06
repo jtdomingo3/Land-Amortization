@@ -4,13 +4,14 @@
   "version": "1.0.0",
   "description": "A sample Apache Cordova application that responds to the deviceready event.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "build:apk": "powershell -ExecutionPolicy Bypass -File ./build_apk.ps1",
     "build:apk:bat": "build_apk.bat",
-    "test": "node test_calculations.js"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "ecosystem:cordova"
