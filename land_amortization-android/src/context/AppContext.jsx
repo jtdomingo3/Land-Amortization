@@ -78,39 +78,6 @@ export function AppProvider({ children }) {
   const [exportLogs, setExportLogs] = useState([]);
   const [dialogConfig, setDialogConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
-  const [globalPaymentModalConfig, setGlobalPaymentModalConfig] = useState({
-    isOpen: false,
-    defaultAccountId: null,
-    defaultPaymentType: 'Monthly Amortization',
-    defaultAmount: null
-  });
-
-  const openNewAccountModal = useCallback(() => {
-    setIsNewAccountModalOpen(true);
-  }, []);
-
-  const closeNewAccountModal = useCallback(() => {
-    setIsNewAccountModalOpen(false);
-  }, []);
-
-  const openNewPaymentModal = useCallback((config = {}) => {
-    if (accounts.length === 0) {
-      showToast('No accounts found. Please create an account first.', 'warning');
-      setIsNewAccountModalOpen(true);
-      return;
-    }
-    setGlobalPaymentModalConfig({
-      isOpen: true,
-      defaultAccountId: config?.defaultAccountId || null,
-      defaultPaymentType: config?.defaultPaymentType || 'Monthly Amortization',
-      defaultAmount: config?.defaultAmount !== undefined ? config.defaultAmount : null
-    });
-  }, [accounts, showToast]);
-
-  const closeNewPaymentModal = useCallback(() => {
-    setGlobalPaymentModalConfig(prev => ({ ...prev, isOpen: false }));
-  }, []);
 
   const showConfirm = useCallback((options) => {
     return new Promise((resolve) => {
@@ -165,6 +132,40 @@ export function AppProvider({ children }) {
 
   const dismissToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
+  const [globalPaymentModalConfig, setGlobalPaymentModalConfig] = useState({
+    isOpen: false,
+    defaultAccountId: null,
+    defaultPaymentType: 'Monthly Amortization',
+    defaultAmount: null
+  });
+
+  const openNewAccountModal = useCallback(() => {
+    setIsNewAccountModalOpen(true);
+  }, []);
+
+  const closeNewAccountModal = useCallback(() => {
+    setIsNewAccountModalOpen(false);
+  }, []);
+
+  const openNewPaymentModal = useCallback((config = {}) => {
+    if (accounts.length === 0) {
+      showToast('No accounts found. Please create an account first.', 'warning');
+      setIsNewAccountModalOpen(true);
+      return;
+    }
+    setGlobalPaymentModalConfig({
+      isOpen: true,
+      defaultAccountId: config?.defaultAccountId || null,
+      defaultPaymentType: config?.defaultPaymentType || 'Monthly Amortization',
+      defaultAmount: config?.defaultAmount !== undefined ? config.defaultAmount : null
+    });
+  }, [accounts, showToast]);
+
+  const closeNewPaymentModal = useCallback(() => {
+    setGlobalPaymentModalConfig(prev => ({ ...prev, isOpen: false }));
   }, []);
 
   useEffect(() => {
