@@ -174,6 +174,22 @@ To run Vite with hot module replacement:
 npm run dev
 ```
 
+### Unit Testing & Quality Assurance
+
+Run the comprehensive unit test suite:
+
+```bash
+npm test
+```
+
+The test runner tests:
+- **`formatters.test.js`**: Strict `MM/DD/YYYY` dates, timezone safety, Philippine Peso currency formatting (`₱`), number formatting, and Month Covered labels.
+- **`dateUtils.test.js`**: Excel `EDATE` month addition, calendar day differences, overdue checks.
+- **`engine_calculations.test.js`**: Base balance, 10% penalty calculation for consecutive missed months, 1% DP penalty condition, penalty payments balance retention, `ACTIVE`, `OVERDUE`, `PENALTY`, and `PAID` statuses.
+- **`waterfall_schedule.test.js`**: 120-month schedule generation, lump-sum advance waterfall payments, partial payments, running consecutive missed counters.
+- **`dashboard_engine.test.js`**: 14 KPI aggregation metrics, collection rates, status counts.
+- **`schema_integrity.test.js`**: SQLite schema constraints (including `is_dp_paid`) and demo sample seed data.
+
 ### Code Quality & Linting
 
 Run Oxlint to check code quality:
@@ -181,6 +197,30 @@ Run Oxlint to check code quality:
 ```bash
 npm run lint
 ```
+
+---
+
+## Compiling the Windows PC Installer (.exe)
+
+To build the production-ready standalone Windows installer:
+
+```bash
+npm run build:win
+```
+
+### Build Process & Configuration:
+1. **Vite Build**: Compiles the React client application and bundles Electron main/preload scripts.
+2. **Native Rebuild**: Prepares native C++ bindings for `better-sqlite3`.
+3. **Electron Builder**: Packages the application into a 64-bit NSIS Windows installer.
+4. **Installer Features**:
+   - Customizable installation directory (not forced into AppData).
+   - Desktop and Start Menu shortcut creation.
+   - Branded setup wizard with legal agreement terms (`build/terms.txt`).
+   - Integrated uninstaller with Windows Add/Remove Programs registration.
+
+### Output Installer Location:
+- **Installer Executable**: [`land_amortization_pc/release/Land Amortization Tracker Setup 1.0.0.exe`](file:///c:/Users/Jeff/repo/Land%20Amortization/land_amortization_pc/release/Land%20Amortization%20Tracker%20Setup%201.0.0.exe) (~135 MB)
+- **Unpacked Folder**: `land_amortization_pc/release/win-unpacked/` (Portable testing binary)
 
 ---
 

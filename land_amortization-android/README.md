@@ -122,6 +122,22 @@ npm run build
 
 ---
 
+### 4. Unit Testing & Quality Assurance
+
+Run the comprehensive unit test suite:
+
+```bash
+npm test
+```
+
+The test runner runs 39 unit tests covering:
+- **`formatters.test.js`**: Strict `MM/DD/YYYY` dates, timezone parsing, Philippine Peso currency (`₱`), number formatters.
+- **`dateUtils.test.js`**: Excel `EDATE` month addition, calendar day differences, overdue checks.
+- **`engine_calculations.test.js`**: Base balance, 10% penalty for consecutive missed months, 1% DP penalty logic, penalty payment retention, and status transitions.
+- **`waterfall_schedule.test.js`**: Waterfall advance scheduling, partial payments, running consecutive missed counters.
+- **`dashboard_engine.test.js`**: 14 KPI aggregation metrics, collection rates, status counts.
+- **`schema_integrity.test.js`**: SQLite schema constraints (`is_dp_paid`, etc.) and sample demo data.
+
 ---
 
 ## Compiling the Android APK Installer
@@ -140,9 +156,10 @@ Or run the build script directly:
 
 This automated script will:
 1. Compile the React web application bundle with Vite (`npm run build`).
-2. Synchronize web assets and plugins to the Android platform (`npx cordova prepare android`).
-3. Compile the debug APK using Gradle 7.6 with JDK 17.
-4. Copy the ready-to-install APK to the root directory as **`LandAmortization-v1.0.0.apk`**.
+2. Synchronize web assets directly into `platforms/android/app/src/main/assets/www/`.
+3. Auto-detect JDK 17 (`JAVA_HOME`) and Android SDK (`ANDROID_HOME`).
+4. Compile the debug APK using Gradle 7.6 (`assembleDebug`).
+5. Copy the ready-to-install APK to the root directory as **`LandAmortization-v1.0.0.apk`** (~12.3 MB).
 
 ---
 

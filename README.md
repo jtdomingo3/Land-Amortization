@@ -23,7 +23,9 @@ Developed by **Gezyne-Jamir Software Tech**.
 - [Getting Started](#getting-started)
   - [Option A: Running Windows PC Desktop Edition](#option-a-running-windows-pc-desktop-edition)
   - [Option B: Running & Compiling Android Mobile Edition](#option-b-running--compiling-android-mobile-edition)
+- [Compiling the Windows PC Desktop Installer (.exe)](#compiling-the-windows-pc-desktop-installer-exe)
 - [Compiling the Android APK Installer](#compiling-the-android-apk-installer)
+- [Automated Unit Testing & Quality Assurance](#automated-unit-testing--quality-assurance)
 - [Database Schema & SQL Migration](#database-schema--sql-migration)
 - [Security & Reverse Engineering Safeguards](#security--reverse-engineering-safeguards)
 - [License & Credits](#license--credits)
@@ -205,6 +207,31 @@ npm run dev
 
 ---
 
+## Compiling the Windows PC Desktop Installer (.exe)
+
+To compile the standalone 64-bit Windows NSIS installer:
+
+```powershell
+# 1. Navigate to PC directory
+cd land_amortization_pc
+
+# 2. Compile web assets, native SQLite, and NSIS installer
+npm run build:win
+```
+
+### Windows Build Specifications:
+- **Build Engine**: Electron Builder + NSIS (`win.target: nsis, arch: x64`)
+- **Native Modules**: Compiles native C++ `better-sqlite3` bindings for Electron
+- **Installer Features**:
+  - Customizable installation directory (supports standard Program Files / custom paths)
+  - Desktop and Start Menu shortcut generation
+  - Integrated legal terms (`build/terms.txt`)
+  - Clean uninstaller registered in Windows Add/Remove Programs
+- **Output Executable**:
+  - [`land_amortization_pc/release/Land Amortization Tracker Setup 1.0.0.exe`](file:///c:/Users/Jeff/repo/Land%20Amortization/land_amortization_pc/release/Land%20Amortization%20Tracker%20Setup%201.0.0.exe) (~135.3 MB)
+
+---
+
 ## Compiling the Android APK Installer
 
 ### Method 1: One-Command Automated Build (Recommended)
@@ -263,6 +290,49 @@ Copy-Item -Path ".\platforms\android\app\build\outputs\apk\debug\app-debug.apk" 
 
 * **Root Installer**: [land_amortization-android/LandAmortization-v1.0.0.apk](file:///c:/Users/Jeff/repo/Land%20Amortization/land_amortization-android/LandAmortization-v1.0.0.apk)
 * **Gradle Build File**: `land_amortization-android/platforms/android/app/build/outputs/apk/debug/app-debug.apk`
+
+---
+
+## Automated Unit Testing & Quality Assurance
+
+Both the PC desktop application and Android mobile edition include automated unit test suites powered by Node.js's native test runner (`node --test`):
+
+```powershell
+# 1. Run Windows PC Desktop Unit Tests (39 tests):
+cd land_amortization_pc
+npm test
+
+# 2. Run Android Mobile Unit Tests (39 tests):
+cd ../land_amortization-android
+npm test
+```
+
+### Complete Test Coverage (78 Tests Across Monorepo):
+1. **Formatters (`formatters.test.js`)**:
+   - Strict `MM/DD/YYYY` formatting across ISO strings, Date objects, and inputs.
+   - Philippine Peso currency formatting (`₱1,500,000.00`) and optional currency symbol toggle.
+   - Comma-separated numbers with customizable decimal precision.
+   - Month Covered formatting (`October 2026`) and ISO date conversion.
+2. **Date Engine (`dateUtils.test.js`)**:
+   - Excel `EDATE` month addition with leap-year and month-end boundary handling.
+   - Positive and negative calendar day difference calculations.
+   - Midnight-referenced overdue detection.
+3. **Calculation Formulas (`engine_calculations.test.js`)**:
+   - Base balance equation (`Contract Amount - Down Payment - Installments Paid`).
+   - 10% late penalty per consecutive missed month.
+   - 1% DP penalty condition (verifying penalty is only incurred when DP is unpaid).
+   - Balance retention after partial regular payments and reduction after penalty settlements.
+   - Status transitions (`ACTIVE`, `OVERDUE`, `PENALTY`, and `PAID`).
+4. **Waterfall Schedule Engine (`waterfall_schedule.test.js`)**:
+   - Full schedule generation across all `num_of_months`.
+   - Sequential advance payment waterfall simulation (e.g. lump sum covering 3+ future months).
+   - Partial payment handling and status flagging.
+5. **Dashboard Aggregations (`dashboard_engine.test.js`)**:
+   - Portfolio receivables, collected funds, penalty balance summations, and collection rate percentages.
+   - Category breakdowns (active, overdue, fully paid, 2+ missed months).
+6. **Database Schema & Data Integrity (`schema_integrity.test.js`)**:
+   - Verification of all required SQLite table definitions (including `is_dp_paid`).
+   - Structural integrity and date validity of sample seed accounts and ledger payments.
 
 ---
 
