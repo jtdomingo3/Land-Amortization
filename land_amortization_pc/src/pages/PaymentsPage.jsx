@@ -148,7 +148,7 @@ export function PaymentsPage() {
           <h4>{payments.length === 0 ? 'No Payment Records Yet' : 'No matching payments found'}</h4>
           <p>
             {payments.length === 0
-              ? 'When buyers make down payments or monthly installments, record them here to automatically reduce balances and generate printable official receipts.'
+              ? 'When buyers make down payments or monthly amortizations, record them here to automatically reduce balances and generate printable official receipts.'
               : 'Try selecting All Buyers or clearing search filters.'}
           </p>
           <div className="empty-actions">

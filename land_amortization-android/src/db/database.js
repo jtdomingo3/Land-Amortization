@@ -74,41 +74,57 @@ export function getSampleData() {
       payment_id: 1,
       account_id: 1001,
       payment_date: addMonthsEdate(todayStr, -11),
-      payment_type: "Installment",
+      payment_type: "Monthly Amortization",
       amount_paid: 12083.33,
+      amortization_amount: 12083.33,
+      penalty_amount: 0,
+      month_covered: "Month 1",
+      for_month_no: 1,
       receipt_no: "OR-10001",
       payment_method: "Cash",
-      remarks: "1st installment"
+      remarks: "1st monthly amortization"
     },
     {
       payment_id: 2,
       account_id: 1001,
       payment_date: addMonthsEdate(todayStr, -10),
-      payment_type: "Installment",
+      payment_type: "Monthly Amortization",
       amount_paid: 12083.33,
+      amortization_amount: 12083.33,
+      penalty_amount: 0,
+      month_covered: "Month 2",
+      for_month_no: 2,
       receipt_no: "OR-10002",
       payment_method: "Cash",
-      remarks: "2nd installment"
+      remarks: "2nd monthly amortization"
     },
     {
       payment_id: 3,
       account_id: 1001,
       payment_date: addMonthsEdate(todayStr, -9),
-      payment_type: "Installment",
+      payment_type: "Monthly Amortization",
       amount_paid: 12083.33,
+      amortization_amount: 12083.33,
+      penalty_amount: 0,
+      month_covered: "Month 3",
+      for_month_no: 3,
       receipt_no: "OR-10003",
       payment_method: "Cash",
-      remarks: "3rd installment"
+      remarks: "3rd monthly amortization"
     },
     {
       payment_id: 4,
       account_id: 1001,
       payment_date: addMonthsEdate(todayStr, -6),
-      payment_type: "Installment",
+      payment_type: "Monthly Amortization",
       amount_paid: 145000.00,
+      amortization_amount: 145000.00,
+      penalty_amount: 0,
+      month_covered: "Advance Amortization",
+      for_month_no: 4,
       receipt_no: "OR-10004",
       payment_method: "Bank Transfer",
-      remarks: "Advance lump sum payment"
+      remarks: "Advance lump sum amortization"
     }
   ];
 
@@ -209,6 +225,14 @@ export async function initDatabase() {
           tx.executeSql('ALTER TABLE payments ADD COLUMN for_month_no INTEGER;', [], () => {}, () => false);
           tx.executeSql('ALTER TABLE payments ADD COLUMN amortization_amount REAL DEFAULT 0;', [], () => {}, () => false);
           tx.executeSql('ALTER TABLE payments ADD COLUMN penalty_amount REAL DEFAULT 0;', [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET payment_type = 'Monthly Amortization' WHERE payment_type = 'Installment';", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET remarks = REPLACE(remarks, 'installment', 'monthly amortization') WHERE remarks LIKE '%installment%';", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET remarks = REPLACE(remarks, 'Installment', 'Monthly Amortization') WHERE remarks LIKE '%Installment%';", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET for_month_no = 1, month_covered = 'Month 1' WHERE receipt_no = 'OR-10001' AND (for_month_no IS NULL OR for_month_no = 0);", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET for_month_no = 2, month_covered = 'Month 2' WHERE receipt_no = 'OR-10002' AND (for_month_no IS NULL OR for_month_no = 0);", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET for_month_no = 3, month_covered = 'Month 3' WHERE receipt_no = 'OR-10003' AND (for_month_no IS NULL OR for_month_no = 0);", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET for_month_no = 4, month_covered = 'Advance Amortization' WHERE receipt_no = 'OR-10004' AND (for_month_no IS NULL OR for_month_no = 0);", [], () => {}, () => false);
+          tx.executeSql("UPDATE payments SET amortization_amount = amount_paid WHERE payment_type = 'Monthly Amortization' AND (amortization_amount IS NULL OR amortization_amount = 0);", [], () => {}, () => false);
         }, (err) => {
           console.error('Database migration error:', err);
           reject(err);
@@ -240,8 +264,50 @@ function setupWebStorage() {
     setWebData(WEB_STORAGE_KEYS.SETTINGS, { theme: 'light', currency: 'PHP' });
     setWebData(WEB_STORAGE_KEYS.EXPORT_LOG, []);
     console.log('Web Storage initialized clean with 0 accounts.');
-  } else if (getWebData(WEB_STORAGE_KEYS.PENALTIES, null) === null) {
-    setWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+  } else {
+    if (getWebData(WEB_STORAGE_KEYS.PENALTIES, null) === null) {
+      setWebData(WEB_STORAGE_KEYS.PENALTIES, []);
+    }
+    // Auto-migrate web storage payments
+    const storedPays = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
+    let hasWebMigrate = false;
+    for (const p of storedPays) {
+      if (p.payment_type === 'Installment') {
+        p.payment_type = 'Monthly Amortization';
+        hasWebMigrate = true;
+      }
+      if (p.remarks && /installment/i.test(p.remarks)) {
+        p.remarks = p.remarks.replace(/installment/gi, 'monthly amortization');
+        hasWebMigrate = true;
+      }
+      if (p.receipt_no === 'OR-10001' && (!p.for_month_no || p.for_month_no === 0)) {
+        p.for_month_no = 1;
+        p.month_covered = 'Month 1';
+        hasWebMigrate = true;
+      }
+      if (p.receipt_no === 'OR-10002' && (!p.for_month_no || p.for_month_no === 0)) {
+        p.for_month_no = 2;
+        p.month_covered = 'Month 2';
+        hasWebMigrate = true;
+      }
+      if (p.receipt_no === 'OR-10003' && (!p.for_month_no || p.for_month_no === 0)) {
+        p.for_month_no = 3;
+        p.month_covered = 'Month 3';
+        hasWebMigrate = true;
+      }
+      if (p.receipt_no === 'OR-10004' && (!p.for_month_no || p.for_month_no === 0)) {
+        p.for_month_no = 4;
+        p.month_covered = 'Advance Amortization';
+        hasWebMigrate = true;
+      }
+      if (p.payment_type === 'Monthly Amortization' && (!p.amortization_amount || p.amortization_amount === 0)) {
+        p.amortization_amount = p.amount_paid;
+        hasWebMigrate = true;
+      }
+    }
+    if (hasWebMigrate) {
+      setWebData(WEB_STORAGE_KEYS.PAYMENTS, storedPays);
+    }
   }
 }
 

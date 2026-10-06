@@ -109,7 +109,7 @@ export function calculateReceiptCoveredMonths(account, targetPayment, allPayment
       receiptIndex: 1,
       totalReceipts: 1,
       monthNo: 1,
-      description: 'Installment Payment',
+      description: 'Monthly Amortization',
       dueDate: targetPayment.payment_date,
       expectedAmount: thisPaid,
       amountApplied: thisPaid,
@@ -159,7 +159,7 @@ export function calculateReceiptCoveredMonths(account, targetPayment, allPayment
   if (receipts.length === 0) {
     receipts.push({
       monthNo: 1,
-      description: 'Advance / Installment Payment',
+      description: 'Advance / Monthly Amortization',
       dueDate: targetPayment.payment_date,
       expectedAmount: thisPaid,
       amountApplied: thisPaid,
@@ -270,7 +270,7 @@ export function generateSingleReceiptHTML({
           </div>
           <div class="doc-row">
             <span class="doc-label">Payment Type:</span>
-            <span class="doc-value">${payment.payment_type || 'Installment'}</span>
+            <span class="doc-value">${payment.payment_type || 'Monthly Amortization'}</span>
           </div>
           ${payment.month_covered ? `
           <div class="doc-row">

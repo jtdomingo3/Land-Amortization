@@ -303,7 +303,7 @@ export function AccountDetailPage({ accountId, onBack }) {
           </div>
 
           <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Installments Paid</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Amortization Paid</span>
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>
               {formatCurrency(account.installments_paid)}
             </div>

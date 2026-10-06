@@ -30,7 +30,7 @@ export function DashboardPage() {
   const [paymentModalConfig, setPaymentModalConfig] = useState({
     isOpen: false,
     defaultAccountId: null,
-    defaultPaymentType: 'Installment',
+    defaultPaymentType: 'Monthly Amortization',
     defaultAmount: null
   });
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
@@ -40,7 +40,7 @@ export function DashboardPage() {
     a => Number(a.down_payment) > 0 && ((Number(a.total_dp_paid) || 0) < Number(a.down_payment))
   );
 
-  const openPaymentModal = (accountId = null, type = 'Installment', amount = null) => {
+  const openPaymentModal = (accountId = null, type = 'Monthly Amortization', amount = null) => {
     setPaymentModalConfig({
       isOpen: true,
       defaultAccountId: accountId,

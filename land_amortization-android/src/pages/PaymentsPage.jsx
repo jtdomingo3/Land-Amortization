@@ -136,7 +136,7 @@ export function PaymentsPage() {
             No payments found
           </h4>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14 }}>
-            Record installment or down payment collections
+            Record amortization or down payment collections
           </p>
           <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)}>
             <Plus size={14} />

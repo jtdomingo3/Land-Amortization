@@ -41,7 +41,7 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
     ['Total Accounts', dashboard.totalAccounts],
     ['Total Contract Amount', dashboard.totalContractAmount],
     ['Total Down Payments', dashboard.totalDownPayments],
-    ['Total Installments Paid', dashboard.totalInstallmentsPaid],
+    ['Total Amortization Paid', dashboard.totalInstallmentsPaid],
     ['Total Collected', dashboard.totalCollected],
     ['Down Payment Penalties (1%)', dashboard.dpPenalties],
     ['10% Penalties', dashboard.tenPercentPenalties],
@@ -68,7 +68,7 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
   const accountHeaders = [
     'Account ID', 'Name', 'Date of Start', 'First Due Date', 'Land Title Number',
     'Land Area (sqm)', 'Total Contract Amount', 'Down Payment', 'Agreed Down Payment Due',
-    'Monthly Amortization', 'No. of Months', 'Installments Paid', 'Total Paid',
+    'Monthly Amortization', 'No. of Months', 'Amortization Paid', 'Total Paid',
     'Base Balance', 'Down Payment Penalty (1%)', 'Consecutive Missed Months',
     '10% Penalty', 'Total Penalties', 'Total Amount Due', 'Outstanding Balance',
     'Next Due Date', 'Days Overdue', 'Status', 'Remarks'

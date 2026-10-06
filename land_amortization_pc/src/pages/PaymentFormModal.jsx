@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../components/Modal.jsx';
 import { PAYMENT_TYPES, PAYMENT_METHODS } from '../utils/constants.js';
-import { toISODateString, formatCurrency, formatNumber, formatDate, formatMonthCovered } from '../utils/formatters.js';
+import { toISODateString, formatNumber, formatDate, formatMonthCovered } from '../utils/formatters.js';
 
 export function PaymentFormModal({
   isOpen,

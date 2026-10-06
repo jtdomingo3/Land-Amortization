@@ -34,11 +34,11 @@ const sampleAccounts = [
 ];
 
 const samplePayments = [
-  { payment_id: 1, account_id: 1001, payment_date: "2026-10-30", payment_type: "Installment", amount_paid: 12083.33, receipt_no: "OR-001", payment_method: "Cash" },
-  { payment_id: 2, account_id: 1001, payment_date: "2026-11-30", payment_type: "Installment", amount_paid: 12083.33, receipt_no: "OR-002", payment_method: "Cash" },
-  { payment_id: 3, account_id: 1002, payment_date: "2026-10-10", payment_type: "Installment", amount_paid: 2334.00, receipt_no: "OR-003", payment_method: "Cash" },
-  { payment_id: 4, account_id: 1001, payment_date: "2026-11-30", payment_type: "Installment", amount_paid: 12083.33, receipt_no: "OR-004", payment_method: "Cash" },
-  { payment_id: 5, account_id: 1001, payment_date: "2026-12-01", payment_type: "Installment", amount_paid: 100000.00, receipt_no: "OR-005", payment_method: "Bank Transfer" }
+  { payment_id: 1, account_id: 1001, payment_date: "2026-10-30", payment_type: "Monthly Amortization", amount_paid: 12083.33, receipt_no: "OR-001", payment_method: "Cash" },
+  { payment_id: 2, account_id: 1001, payment_date: "2026-11-30", payment_type: "Monthly Amortization", amount_paid: 12083.33, receipt_no: "OR-002", payment_method: "Cash" },
+  { payment_id: 3, account_id: 1002, payment_date: "2026-10-10", payment_type: "Monthly Amortization", amount_paid: 2334.00, receipt_no: "OR-003", payment_method: "Cash" },
+  { payment_id: 4, account_id: 1001, payment_date: "2026-11-30", payment_type: "Monthly Amortization", amount_paid: 12083.33, receipt_no: "OR-004", payment_method: "Cash" },
+  { payment_id: 5, account_id: 1001, payment_date: "2026-12-01", payment_type: "Monthly Amortization", amount_paid: 100000.00, receipt_no: "OR-005", payment_method: "Bank Transfer" }
 ];
 
 console.log("=== TESTING CALCULATION ENGINE ===");

@@ -114,7 +114,7 @@ export function SchedulePage() {
           fontSize: '0.78rem'
         }}>
           <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Installments Paid</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Amortization Paid</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-emerald-light)' }}>
               {formatCurrency(currentAccount.installments_paid)}
             </div>

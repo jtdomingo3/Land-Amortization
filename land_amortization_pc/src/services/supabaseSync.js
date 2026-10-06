@@ -173,10 +173,19 @@ export async function testSupabaseConnection() {
 /**
  * SQL Schema for Supabase setup
  */
-export const SUPABASE_SQL_SCHEMA = `-- Land Amortization Tracker: Supabase PostgreSQL Schema
--- Run this in your Supabase SQL Editor to enable real-time sync with PC and Mobile
+export const SUPABASE_SQL_SCHEMA = `-- ============================================================
+-- Land Amortization Tracker: Supabase PostgreSQL Schema
+-- Run this in your Supabase SQL Editor (SQL Editor > New Query)
+-- ============================================================
 
--- 1. Accounts Table
+-- 1. Run this migration if you already created the tables previously:
+ALTER TABLE land_accounts ADD COLUMN IF NOT EXISTS is_dp_paid INTEGER DEFAULT 0;
+ALTER TABLE land_payments ADD COLUMN IF NOT EXISTS month_covered TEXT;
+ALTER TABLE land_payments ADD COLUMN IF NOT EXISTS for_month_no INTEGER;
+ALTER TABLE land_payments ADD COLUMN IF NOT EXISTS amortization_amount NUMERIC DEFAULT 0;
+ALTER TABLE land_payments ADD COLUMN IF NOT EXISTS penalty_amount NUMERIC DEFAULT 0;
+
+-- 2. Fresh Accounts Table
 CREATE TABLE IF NOT EXISTS land_accounts (
   account_id BIGINT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -194,7 +203,7 @@ CREATE TABLE IF NOT EXISTS land_accounts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Payments Table
+-- 3. Fresh Payments Table
 CREATE TABLE IF NOT EXISTS land_payments (
   payment_id BIGINT PRIMARY KEY,
   account_id BIGINT NOT NULL REFERENCES land_accounts(account_id) ON DELETE CASCADE,
@@ -204,20 +213,120 @@ CREATE TABLE IF NOT EXISTS land_payments (
   receipt_no TEXT,
   payment_method TEXT DEFAULT 'Cash',
   remarks TEXT,
+  month_covered TEXT,
+  for_month_no INTEGER,
+  amortization_amount NUMERIC DEFAULT 0,
+  penalty_amount NUMERIC DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_land_payments_account ON land_payments(account_id);
 
--- Enable Row Level Security (RLS) or public access
+-- 4. Penalties Table (Optional/Advanced penalty ledger)
+CREATE TABLE IF NOT EXISTS land_penalties (
+  penalty_id BIGINT PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES land_accounts(account_id) ON DELETE CASCADE,
+  month_no INTEGER,
+  month_name TEXT,
+  due_date TEXT,
+  penalty_amount NUMERIC NOT NULL,
+  penalty_reason TEXT,
+  status TEXT NOT NULL DEFAULT 'UNPAID',
+  paid_amount NUMERIC DEFAULT 0,
+  waived_amount NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_land_penalties_account ON land_penalties(account_id, status);
+
+-- 5. Enable Row Level Security (RLS) & Policies
 ALTER TABLE land_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE land_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE land_penalties ENABLE ROW LEVEL SECURITY;
 
--- Allow read/write access for the app key
 CREATE POLICY "Allow all operations for land_accounts" ON land_accounts FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all operations for land_payments" ON land_payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for land_penalties" ON land_penalties FOR ALL USING (true) WITH CHECK (true);
 `;
+
+/**
+ * Safely upsert accounts handling schema discrepancies if remote table lacks is_dp_paid
+ */
+async function safeUpsertAccounts(client, accountsList) {
+  if (!accountsList || accountsList.length === 0) return;
+
+  const { error } = await client.from('land_accounts').upsert(accountsList, { onConflict: 'account_id' });
+  if (!error) return;
+
+  const errMsg = (error.message || '').toLowerCase();
+  const isSchemaMismatch = errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist');
+
+  if (isSchemaMismatch) {
+    console.warn('[Cloud Sync] Note: Remote land_accounts missing columns (' + error.message + '). Retrying without is_dp_paid...');
+    const legacyAccs = accountsList.map(a => {
+      const { is_dp_paid, ...rest } = a;
+      return rest;
+    });
+
+    const retryRes = await client.from('land_accounts').upsert(legacyAccs, { onConflict: 'account_id' });
+    if (!retryRes.error) {
+      console.log('[Cloud Sync] Accounts synced with legacy compatibility.');
+      return;
+    }
+    throw new Error(`Error uploading accounts to cloud: ${retryRes.error.message}`);
+  }
+
+  throw new Error(`Error uploading accounts to cloud: ${error.message}`);
+}
+
+/**
+ * Safely upsert payments handling schema discrepancies if remote table lacks new columns
+ */
+async function safeUpsertPayments(client, paymentsList) {
+  if (!paymentsList || paymentsList.length === 0) return;
+
+  const { error } = await client.from('land_payments').upsert(paymentsList, { onConflict: 'payment_id' });
+  if (!error) return;
+
+  const errMsg = (error.message || '').toLowerCase();
+  const isSchemaMismatch = errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist');
+
+  if (isSchemaMismatch) {
+    console.warn('[Cloud Sync] Note: Remote land_payments missing columns (' + error.message + '). Retrying with legacy columns...');
+    
+    // First try legacy columns (with month_covered)
+    let legacyPays = paymentsList.map(p => {
+      const { amortization_amount, penalty_amount, for_month_no, ...rest } = p;
+      return rest;
+    });
+
+    let retryRes = await client.from('land_payments').upsert(legacyPays, { onConflict: 'payment_id' });
+    if (!retryRes.error) {
+      console.log('[Cloud Sync] Payments synced with legacy compatibility.');
+      return;
+    }
+
+    // If month_covered also doesn't exist on remote table, strip that as well
+    const retryErrMsg = (retryRes.error.message || '').toLowerCase();
+    if (retryErrMsg.includes('column') || retryErrMsg.includes('schema cache') || retryErrMsg.includes('does not exist')) {
+      legacyPays = paymentsList.map(p => {
+        const { amortization_amount, penalty_amount, for_month_no, month_covered, ...coreOnly } = p;
+        return coreOnly;
+      });
+      const coreRetryRes = await client.from('land_payments').upsert(legacyPays, { onConflict: 'payment_id' });
+      if (!coreRetryRes.error) {
+        console.log('[Cloud Sync] Payments synced with core legacy compatibility.');
+        return;
+      }
+      throw new Error(`Error uploading payments to cloud: ${coreRetryRes.error.message}`);
+    }
+
+    throw new Error(`Error uploading payments to cloud: ${retryRes.error.message}`);
+  }
+
+  throw new Error(`Error uploading payments to cloud: ${error.message}`);
+}
 
 /**
  * Full Synchronize local SQLite / Web data with Supabase Cloud
@@ -283,13 +392,7 @@ export async function syncWithSupabase() {
         updated_at: new Date().toISOString()
       }));
 
-      const { error: upsertAccErr } = await client
-        .from('land_accounts')
-        .upsert(cleanAccs, { onConflict: 'account_id' });
-
-      if (upsertAccErr) {
-        throw new Error(`Error uploading accounts to cloud: ${upsertAccErr.message}`);
-      }
+      await safeUpsertAccounts(client, cleanAccs);
     }
 
     // 4. Push local payments to cloud (upsert)
@@ -310,13 +413,7 @@ export async function syncWithSupabase() {
         updated_at: new Date().toISOString()
       }));
 
-      const { error: upsertPayErr } = await client
-        .from('land_payments')
-        .upsert(cleanPays, { onConflict: 'payment_id' });
-
-      if (upsertPayErr) {
-        throw new Error(`Error uploading payments to cloud: ${upsertPayErr.message}`);
-      }
+      await safeUpsertPayments(client, cleanPays);
     }
 
     // 5. Handle deleted items tombstones & prevent resurrection
@@ -396,7 +493,17 @@ export async function syncUpsertAccount(account) {
       remarks: account.remarks || null,
       updated_at: new Date().toISOString()
     };
-    await client.from('land_accounts').upsert(clean, { onConflict: 'account_id' });
+    let { error } = await client.from('land_accounts').upsert(clean, { onConflict: 'account_id' });
+    if (error) {
+      const errMsg = (error.message || '').toLowerCase();
+      if (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist')) {
+        const { is_dp_paid, ...legacy } = clean;
+        const retryRes = await client.from('land_accounts').upsert(legacy, { onConflict: 'account_id' });
+        if (retryRes.error) throw retryRes.error;
+      } else {
+        throw error;
+      }
+    }
     const now = new Date().toISOString();
     saveSupabaseConfig({ lastSyncedAt: now });
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
@@ -451,7 +558,21 @@ export async function syncUpsertPayment(payment) {
       penalty_amount: payment.penalty_amount || (payment.payment_type === 'Penalty' ? payment.amount_paid : 0),
       updated_at: new Date().toISOString()
     };
-    await client.from('land_payments').upsert(clean, { onConflict: 'payment_id' });
+    let { error } = await client.from('land_payments').upsert(clean, { onConflict: 'payment_id' });
+    if (error) {
+      const errMsg = (error.message || '').toLowerCase();
+      if (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist')) {
+        const { amortization_amount, penalty_amount, for_month_no, ...legacy } = clean;
+        let retryRes = await client.from('land_payments').upsert(legacy, { onConflict: 'payment_id' });
+        if (retryRes.error) {
+          const { month_covered, ...coreOnly } = legacy;
+          const retryRes2 = await client.from('land_payments').upsert(coreOnly, { onConflict: 'payment_id' });
+          if (retryRes2.error) throw retryRes2.error;
+        }
+      } else {
+        throw error;
+      }
+    }
     const now = new Date().toISOString();
     saveSupabaseConfig({ lastSyncedAt: now });
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}

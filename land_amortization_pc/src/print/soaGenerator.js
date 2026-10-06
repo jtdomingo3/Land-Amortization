@@ -188,7 +188,7 @@ export function generateSOAHTML(account, payments = [], options = {}) {
               <tr>
                 <td>${formatDate(p.payment_date)}</td>
                 <td class="mono">${p.receipt_no || '-'}</td>
-                <td>${p.payment_type || 'Installment'}</td>
+                <td>${p.payment_type || 'Monthly Amortization'}</td>
                 <td style="font-size: 0.74rem; color: ${p.month_covered ? '#4338ca' : '#94a3b8'}; font-weight: ${p.month_covered ? '600' : 'normal'};">${p.month_covered || '-'}</td>
                 <td>${p.payment_method || 'Cash'}</td>
                 <td class="right mono" style="font-weight: 700; color: #047857;">

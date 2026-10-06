@@ -57,7 +57,7 @@ function initSQLite() {
         payment_id     INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id     INTEGER NOT NULL,
         payment_date   TEXT NOT NULL,
-        payment_type   TEXT NOT NULL DEFAULT 'Installment',
+        payment_type   TEXT NOT NULL DEFAULT 'Monthly Amortization',
         amount_paid    REAL NOT NULL,
         receipt_no     TEXT,
         payment_method TEXT DEFAULT 'Cash',
@@ -84,11 +84,44 @@ function initSQLite() {
     `);
 
     // Column migrations
+    try { db.exec('ALTER TABLE land_accounts ADD COLUMN is_dp_paid INTEGER DEFAULT 0;'); } catch (_) {}
+    try { db.exec('ALTER TABLE payments ADD COLUMN month_covered TEXT;'); } catch (_) {}
+    try { db.exec('ALTER TABLE payments ADD COLUMN for_month_no INTEGER;'); } catch (_) {}
+    try { db.exec('ALTER TABLE payments ADD COLUMN amortization_amount REAL DEFAULT 0;'); } catch (_) {}
+    try { db.exec('ALTER TABLE payments ADD COLUMN penalty_amount REAL DEFAULT 0;'); } catch (_) {}
     try {
-      db.exec('ALTER TABLE land_accounts ADD COLUMN is_dp_paid INTEGER DEFAULT 0;');
-    } catch {
-      // Column already exists
-    }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS penalties (
+          penalty_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id     INTEGER NOT NULL,
+          month_no       INTEGER NOT NULL,
+          month_name     TEXT,
+          due_date       TEXT,
+          penalty_amount REAL NOT NULL,
+          penalty_reason TEXT,
+          status         TEXT NOT NULL DEFAULT 'UNPAID',
+          paid_amount    REAL DEFAULT 0,
+          waived_amount  REAL DEFAULT 0,
+          created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_penalties_account ON penalties(account_id, status);
+      `);
+    } catch (_) {}
+
+    // Auto-migrate legacy payment types 'Installment' to 'Monthly Amortization'
+    try {
+      db.exec(`
+        UPDATE payments SET payment_type = 'Monthly Amortization' WHERE payment_type = 'Installment';
+        UPDATE payments SET remarks = REPLACE(remarks, 'installment', 'monthly amortization') WHERE remarks LIKE '%installment%';
+        UPDATE payments SET remarks = REPLACE(remarks, 'Installment', 'Monthly Amortization') WHERE remarks LIKE '%Installment%';
+        UPDATE payments SET for_month_no = 1, month_covered = 'Month 1' WHERE receipt_no = 'OR-10001' AND (for_month_no IS NULL OR for_month_no = 0);
+        UPDATE payments SET for_month_no = 2, month_covered = 'Month 2' WHERE receipt_no = 'OR-10002' AND (for_month_no IS NULL OR for_month_no = 0);
+        UPDATE payments SET for_month_no = 3, month_covered = 'Month 3' WHERE receipt_no = 'OR-10003' AND (for_month_no IS NULL OR for_month_no = 0);
+        UPDATE payments SET for_month_no = 4, month_covered = 'Advance Amortization' WHERE receipt_no = 'OR-10004' AND (for_month_no IS NULL OR for_month_no = 0);
+        UPDATE payments SET amortization_amount = amount_paid WHERE payment_type = 'Monthly Amortization' AND (amortization_amount IS NULL OR amortization_amount = 0);
+      `);
+    } catch (_) {}
 
     console.log('[SQLite] Schema migration successful.');
   } catch (err) {
@@ -123,7 +156,14 @@ function setupIpcHandlers() {
   // Exec (multi-statement DDL/script)
   ipcMain.handle('sqlite:exec', async (_event, sql) => {
     if (!db) throw new Error('Database not initialized');
-    db.exec(sql);
+    try {
+      db.exec(sql);
+    } catch (err) {
+      if (err.message && (err.message.includes('duplicate column name') || err.message.includes('already exists'))) {
+        return true;
+      }
+      throw err;
+    }
     return true;
   });
 

@@ -19,9 +19,9 @@ export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
       case 'accounts':
         return { title: 'Accounts Directory', subtitle: 'Manage land buyers, contracts, and terms' };
       case 'payments':
-        return { title: 'Payment Ledger', subtitle: 'Track installment collections & official receipts' };
+        return { title: 'Payment Ledger', subtitle: 'Track amortization collections & official receipts' };
       case 'schedule':
-        return { title: 'Amortization Schedules', subtitle: 'Projected vs actual installment waterfall breakdown' };
+        return { title: 'Amortization Schedules', subtitle: 'Projected vs actual amortization waterfall breakdown' };
       case 'export':
         return { title: 'Export & Cloud Sync', subtitle: 'Backup to Excel or synchronize with Supabase' };
       case 'settings':
