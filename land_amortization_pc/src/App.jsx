@@ -10,6 +10,8 @@ import { ExportSharePage } from './pages/ExportSharePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { HelpPage } from './pages/HelpPage.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
+import { AccountFormModal } from './pages/AccountFormModal.jsx';
+import { PaymentFormModal } from './pages/PaymentFormModal.jsx';
 import { Loader2 } from 'lucide-react';
 import { syncWithSupabase } from './services/supabaseSync.js';
 
@@ -22,7 +24,14 @@ export function App() {
     isSyncing,
     syncStatus,
     lastSyncedAt,
-    syncCloud
+    syncCloud,
+    accounts,
+    addAccount,
+    addPayment,
+    isNewAccountModalOpen,
+    closeNewAccountModal,
+    globalPaymentModalConfig,
+    closeNewPaymentModal
   } = useApp();
 
   const handleSyncCloud = () => {
@@ -107,6 +116,24 @@ export function App() {
         </div>
 
         <WelcomeModal />
+
+        {/* Global Action Modals triggered by upper-left Sidebar shortcuts */}
+        <AccountFormModal
+          isOpen={isNewAccountModalOpen}
+          onClose={closeNewAccountModal}
+          onSave={addAccount}
+          existingAccounts={accounts}
+        />
+
+        <PaymentFormModal
+          isOpen={Boolean(globalPaymentModalConfig?.isOpen)}
+          onClose={closeNewPaymentModal}
+          onSave={addPayment}
+          accounts={accounts}
+          defaultAccountId={globalPaymentModalConfig?.defaultAccountId || null}
+          defaultPaymentType={globalPaymentModalConfig?.defaultPaymentType || 'Monthly Amortization'}
+          defaultAmount={globalPaymentModalConfig?.defaultAmount !== undefined ? globalPaymentModalConfig.defaultAmount : null}
+        />
       </div>
 
       <div id="print-area"></div>

@@ -16,7 +16,30 @@ import {
 } from 'lucide-react';
 
 export function Sidebar({ onNewAccount, onNewPayment }) {
-  const { activeTab, setActiveTab, accounts, payments } = useApp();
+  const {
+    activeTab,
+    setActiveTab,
+    accounts,
+    payments,
+    openNewAccountModal,
+    openNewPaymentModal
+  } = useApp();
+
+  const handleNewAccount = () => {
+    if (onNewAccount) {
+      onNewAccount();
+    } else {
+      openNewAccountModal();
+    }
+  };
+
+  const handleRecordPayment = () => {
+    if (onNewPayment) {
+      onNewPayment();
+    } else {
+      openNewPaymentModal();
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -44,23 +67,19 @@ export function Sidebar({ onNewAccount, onNewPayment }) {
       {/* Quick Action Buttons for Easy PC Usage */}
       <div className="sidebar-quick-actions">
         <button
+          type="button"
           className="btn btn-primary btn-sm sidebar-quick-btn"
-          onClick={() => {
-            setActiveTab('accounts');
-            if (onNewAccount) onNewAccount();
-          }}
-          title="Create New Land Amortization Account"
+          onClick={handleNewAccount}
+          title="Open New Account Form"
         >
           <PlusCircle size={15} />
           <span>New Account</span>
         </button>
 
         <button
+          type="button"
           className="btn btn-secondary btn-sm sidebar-quick-btn"
-          onClick={() => {
-            setActiveTab('payments');
-            if (onNewPayment) onNewPayment();
-          }}
+          onClick={handleRecordPayment}
           title="Record a Payment"
         >
           <CreditCard size={15} />
