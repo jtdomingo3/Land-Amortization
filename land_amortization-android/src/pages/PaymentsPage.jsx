@@ -22,7 +22,9 @@ export function PaymentsPage() {
     payments,
     addPayment,
     updatePayment,
-    deletePayment
+    deletePayment,
+    showConfirm,
+    showToast
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,8 +63,17 @@ export function PaymentsPage() {
   }, [filteredPayments]);
 
   const handleDelete = async (payment) => {
-    if (confirm(`Delete payment of ${formatCurrency(payment.amount_paid)} for ${payment.name}?`)) {
+    const confirmed = await showConfirm({
+      title: 'Delete Payment Record?',
+      message: `Are you sure you want to delete payment of ${formatCurrency(payment.amount_paid)} for ${payment.name}?`,
+      details: 'This will remove the payment from both local SQLite and cloud ledger, and recalculate customer balances.',
+      confirmText: 'Delete Payment',
+      cancelText: 'Keep Payment',
+      type: 'danger'
+    });
+    if (confirmed) {
       await deletePayment(payment.payment_id);
+      showToast(`Payment of ${formatCurrency(payment.amount_paid)} deleted`, 'success');
     }
   };
 

@@ -34,7 +34,10 @@ export function AccountDetailPage({ accountId, onBack }) {
     deletePayment,
     waivePenalty,
     setActiveTab,
-    setSelectedAccountId
+    setSelectedAccountId,
+    showConfirm,
+    showAlert,
+    showToast
   } = useApp();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -79,30 +82,59 @@ export function AccountDetailPage({ accountId, onBack }) {
   );
 
   const handleDeleteAccount = async () => {
-    const confirmText = `Are you sure you want to permanently delete Account #${account.account_id} (${account.name})?\n\nThis will remove all associated payments and cloud database records. This action cannot be undone.`;
-    if (window.confirm(confirmText)) {
+    const confirmed = await showConfirm({
+      title: `Delete Account #${account.account_id}?`,
+      message: `Are you sure you want to permanently delete ${account.name}'s account?`,
+      details: 'This will remove all associated payments, ledger history, and cloud database records. This action cannot be undone.',
+      confirmText: 'Delete Account',
+      cancelText: 'Keep Account',
+      type: 'danger'
+    });
+    if (confirmed) {
       await deleteAccount(account.account_id);
+      showToast(`Account #${account.account_id} (${account.name}) deleted`, 'success');
       onBack();
     }
   };
 
   const handleDeletePayment = async (p) => {
-    const confirmText = `Delete payment #${p.receipt_no || p.payment_id} for ${formatCurrency(p.amount_paid)} (${formatDate(p.payment_date)})?\n\nThis will recompute the customer balance and remove the record from Supabase cloud database.`;
-    if (window.confirm(confirmText)) {
+    const confirmed = await showConfirm({
+      title: 'Delete Payment Record?',
+      message: `Delete payment #${p.receipt_no || p.payment_id} of ${formatCurrency(p.amount_paid)} paid on ${formatDate(p.payment_date)}?`,
+      details: 'This will recompute the customer balance and remove the payment from both local SQLite and cloud ledger.',
+      confirmText: 'Delete Payment',
+      cancelText: 'Keep Payment',
+      type: 'danger'
+    });
+    if (confirmed) {
       await deletePayment(p.payment_id);
+      showToast(`Payment of ${formatCurrency(p.amount_paid)} deleted`, 'success');
     }
   };
 
   const handleWaiveAccountPenalties = async () => {
     const unpaidList = accountPenalties.filter(p => p.status === 'UNPAID');
     if (unpaidList.length === 0) {
-      alert('No recorded penalty records to waive. Any automatic calculation penalty will clear once settled.');
+      await showAlert({
+        title: 'No Outstanding Penalties',
+        message: 'No recorded penalty items to waive. Any automatic calculation penalty will clear once regular amortization is settled.',
+        type: 'info'
+      });
       return;
     }
-    if (window.confirm(`Waive ${unpaidList.length} outstanding penalty records for ${account.name}?`)) {
+    const confirmed = await showConfirm({
+      title: 'Waive Outstanding Penalties?',
+      message: `Waive ${unpaidList.length} outstanding penalty record${unpaidList.length > 1 ? 's' : ''} for ${account.name}?`,
+      details: 'This will update penalty records to waived status in both local database and cloud ledger.',
+      confirmText: 'Waive Penalties',
+      cancelText: 'Cancel',
+      type: 'warning'
+    });
+    if (confirmed) {
       for (const p of unpaidList) {
         await waivePenalty(p.penalty_id);
       }
+      showToast(`Waived ${unpaidList.length} penalty record${unpaidList.length > 1 ? 's' : ''}`, 'success');
     }
   };
 

@@ -28,20 +28,28 @@ export function formatNumber(val, decimals = 0) {
 }
 
 /**
- * Format date string (YYYY-MM-DD or ISO) to clean readable format
+ * Format date string (YYYY-MM-DD or ISO) to MM/DD/YYYY format
  * @param {string|Date} dateVal 
- * @returns {string}
+ * @returns {string} MM/DD/YYYY
  */
 export function formatDate(dateVal) {
   if (!dateVal) return '-';
   try {
-    const d = new Date(dateVal);
+    if (typeof dateVal === 'string') {
+      const match = dateVal.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (match) {
+        const y = match[1];
+        const m = match[2].padStart(2, '0');
+        const d = match[3].padStart(2, '0');
+        return `${m}/${d}/${y}`;
+      }
+    }
+    const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
     if (isNaN(d.getTime())) return String(dateVal);
-    return d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit'
-    });
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${month}/${day}/${year}`;
   } catch {
     return String(dateVal);
   }

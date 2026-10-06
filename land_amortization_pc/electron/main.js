@@ -809,12 +809,17 @@ function createWindow() {
   });
 
   // Forward renderer console errors and warnings directly to Electron terminal stdout
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('console-message', function (event) {
+    const level = event && typeof event.level === 'number' ? event.level : (arguments.length > 1 ? arguments[1] : 0);
+    const message = event && typeof event.message === 'string' ? event.message : (arguments.length > 2 ? arguments[2] : '');
+    const line = event && typeof event.lineNumber === 'number' ? event.lineNumber : (arguments.length > 3 ? arguments[3] : 1);
+    const sourceId = event && typeof event.sourceId === 'string' ? event.sourceId : (arguments.length > 4 ? arguments[4] : '');
+
     const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
     const lvlName = levels[level] || 'LOG';
-    if (level >= 2) {
+    if (level >= 2 && message && !message.includes('Electron Security Warning')) {
       const srcName = sourceId ? path.basename(sourceId) : 'renderer';
-      console.log(`[Renderer ${lvlName}] ${message} (${srcName}:${line})`);
+      console.log(`[Renderer ${lvlName}] ${message} (${srcName}:${line || 1})`);
     }
   });
 

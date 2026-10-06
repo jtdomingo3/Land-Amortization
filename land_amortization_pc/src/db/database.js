@@ -667,11 +667,26 @@ export async function insertPayment(p) {
 
   if (isWebFallback) {
     const list = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
-    const nextId = list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1;
+    const nextId = p.payment_id || (list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1);
     const newPayment = { ...payment, payment_id: nextId };
     list.push(newPayment);
     setWebData(WEB_STORAGE_KEYS.PAYMENTS, list);
     return newPayment;
+  }
+
+  if (p.payment_id) {
+    const sql = `
+      INSERT OR REPLACE INTO payments (
+        payment_id, account_id, payment_date, payment_type, amount_paid, receipt_no, payment_method, remarks,
+        month_covered, for_month_no, amortization_amount, penalty_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    await runSql(sql, [
+      p.payment_id, payment.account_id, payment.payment_date, payment.payment_type,
+      payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks,
+      payment.month_covered, payment.for_month_no, payment.amortization_amount, payment.penalty_amount
+    ]);
+    return { ...payment, payment_id: p.payment_id };
   }
 
   const sql = `

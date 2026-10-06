@@ -3,7 +3,7 @@ import { INSTRUCTIONS, PENALTY_RULES } from '../utils/constants.js';
 import { computeAccountDerived, computePaymentDerived } from '../engine/calculations.js';
 import { computeMonthlySchedule } from '../engine/waterfall.js';
 import { computeDashboard } from '../engine/dashboard.js';
-import { toISODateString } from '../utils/formatters.js';
+import { toISODateString, formatDate } from '../utils/formatters.js';
 
 /**
  * Generates an XLSX workbook binary with all 5 sheets.
@@ -79,13 +79,13 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
     accountRows.push([
       acc.account_id,
       acc.name,
-      acc.date_of_start,
-      acc.first_due_date,
+      formatDate(acc.date_of_start),
+      formatDate(acc.first_due_date),
       acc.land_title_number,
       acc.land_area_sqm,
       acc.total_contract_amount,
       acc.down_payment,
-      acc.agreed_dp_due,
+      formatDate(acc.agreed_dp_due),
       acc.monthly_amortization,
       acc.num_of_months,
       acc.installments_paid,
@@ -97,7 +97,7 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
       acc.total_penalties,
       acc.total_amount_due,
       acc.outstanding_balance,
-      acc.next_due_date,
+      formatDate(acc.next_due_date),
       acc.days_overdue,
       acc.status,
       acc.remarks || ''
@@ -130,7 +130,7 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
       p.payment_id,
       p.account_id,
       p.name,
-      p.payment_date,
+      formatDate(p.payment_date),
       p.payment_type,
       p.for_month_no || '',
       p.month_covered || '',
@@ -170,7 +170,7 @@ export function generateWorkbook(accounts = [], payments = [], todayRef = new Da
         row.account_id,
         row.name,
         row.month_no,
-        row.due_date,
+        formatDate(row.due_date),
         row.expected_amortization,
         row.amount_applied,
         row.advance_remaining,

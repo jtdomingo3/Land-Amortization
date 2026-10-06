@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export function DashboardPage() {
-  const { dashboard, accounts, payments, setActiveTab, setSelectedAccountId, addAccount, addPayment, shareDrive, exportExcel, resetSample } = useApp();
+  const { dashboard, accounts, payments, setActiveTab, setSelectedAccountId, addAccount, addPayment, shareDrive, exportExcel, resetSample, showToast, showAlert } = useApp();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [paymentModalConfig, setPaymentModalConfig] = useState({
     isOpen: false,
@@ -66,7 +66,7 @@ export function DashboardPage() {
 
       if (config.webhookUrl && config.webhookUrl.trim()) {
         const uploadRes = await uploadToGoogleDrive(accounts, payments, targetFileName);
-        alert(uploadRes.message || `Uploaded "${targetFileName}" directly to your Google Drive folder!`);
+        showToast(uploadRes.message || `Uploaded "${targetFileName}" directly to your Google Drive!`, 'success');
         return;
       }
 

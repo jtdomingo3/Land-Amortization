@@ -401,7 +401,7 @@ export function generateSingleReceiptHTML({
       <!-- FOOTER -->
       <div class="doc-footer">
         <div>Official Receipt • ${companyName}</div>
-        <div>Date Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}</div>
+        <div>Date Generated: ${formatDate(new Date())}</div>
       </div>
     </div>
   `;

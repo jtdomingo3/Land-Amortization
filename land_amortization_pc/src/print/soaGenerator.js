@@ -93,7 +93,7 @@ export function generateSOAHTML(account, payments = [], options = {}) {
         <div class="doc-title-badge">
           <div class="doc-type-title">STATEMENT OF ACCOUNT</div>
           <div style="font-size: 0.76rem; color: #475569; margin-top: 4px;">
-            Issued: <strong>${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}</strong>
+            Issued: <strong>${formatDate(new Date())}</strong>
           </div>
         </div>
       </div>
@@ -348,7 +348,7 @@ export function generateSOAHTML(account, payments = [], options = {}) {
       <!-- FOOTER -->
       <div class="doc-footer">
         <div>Statement of Account • ${companyName}</div>
-        <div>Date Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}</div>
+        <div>Date Generated: ${formatDate(new Date())}</div>
       </div>
     </div>
   `;

@@ -42,7 +42,7 @@ import {
 import { formatLastSync } from '../utils/formatters.js';
 
 export function SettingsPage({ defaultOpenHelp = false }) {
-  const { resetSample, clearAll, refreshData } = useApp();
+  const { resetSample, clearAll, refreshData, showConfirm, showAlert, showToast } = useApp();
 
   const [form, setForm] = useState(DEFAULT_COMPANY);
   const [loading, setLoading] = useState(true);
@@ -98,7 +98,13 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   };
 
   const handleLoadSample = async () => {
-    if (confirm('Load default company details (CORTEZ LAND AMORTIZATION COLLECTION TRACKER)? Any unsaved edits will be replaced.')) {
+    const confirmed = await showConfirm({
+      title: 'Load Default Company Details?',
+      message: 'Load default company details from configuration? Any unsaved edits will be replaced.',
+      confirmText: 'Load Defaults',
+      type: 'warning'
+    });
+    if (confirmed) {
       try {
         const sample = await loadSampleCompany(true);
         setForm(sample);
@@ -114,14 +120,14 @@ export function SettingsPage({ defaultOpenHelp = false }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert('Logo image should be under 2MB.');
+      await showAlert({ title: 'File Too Large', message: 'Logo image should be under 2MB.', type: 'warning' });
       return;
     }
     try {
       const b64 = await fileToBase64(file);
       handleChange('company_logo', b64);
     } catch (err) {
-      alert('Failed to read logo image: ' + err.message);
+      await showAlert({ title: 'Upload Failed', message: 'Failed to read logo image: ' + err.message, type: 'danger' });
     }
   };
 
@@ -129,14 +135,14 @@ export function SettingsPage({ defaultOpenHelp = false }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert('Signature image should be under 2MB.');
+      await showAlert({ title: 'File Too Large', message: 'Signature image should be under 2MB.', type: 'warning' });
       return;
     }
     try {
       const b64 = await fileToBase64(file);
       handleChange('signatory_esig', b64);
     } catch (err) {
-      alert('Failed to read signature image: ' + err.message);
+      await showAlert({ title: 'Upload Failed', message: 'Failed to read signature image: ' + err.message, type: 'danger' });
     }
   };
 
@@ -196,13 +202,20 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   };
 
   const handleResetSampleAccounts = async () => {
-    if (confirm('Reset accounts and payments to demo sample data? This will overwrite existing accounts.')) {
+    const confirmed = await showConfirm({
+      title: 'Reset to Demo Sample Data?',
+      message: 'Reset accounts and payments to demo sample data? This will overwrite existing accounts.',
+      details: 'This will restore default sample buyers (Juan Dela Cruz, Pedro Santos, etc.) into your local database.',
+      confirmText: 'Reset Demo Data',
+      type: 'warning'
+    });
+    if (confirmed) {
       setIsDataActionLoading(true);
       try {
         await resetSample();
-        setSaveStatus({ type: 'success', message: 'Demo sample accounts restored successfully.' });
+        showToast('Demo sample accounts restored successfully', 'success');
       } catch (err) {
-        alert('Reset failed: ' + err.message);
+        await showAlert({ title: 'Reset Failed', message: 'Reset failed: ' + err.message, type: 'danger' });
       } finally {
         setIsDataActionLoading(false);
       }
@@ -210,13 +223,21 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   };
 
   const handleClearAllData = async () => {
-    if (confirm('⚠️ WARNING: This will permanently delete ALL accounts and payments. Are you absolutely sure?')) {
+    const confirmed = await showConfirm({
+      title: 'Clear All Accounts & Payments?',
+      message: 'This will permanently delete ALL accounts and payment records from the local database.',
+      details: 'This action cannot be undone. All customer profiles, payments, and schedule ledgers will be permanently deleted.',
+      confirmText: 'Delete All Data',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (confirmed) {
       setIsDataActionLoading(true);
       try {
         await clearAll();
-        setSaveStatus({ type: 'success', message: 'All database accounts and payments cleared.' });
+        showToast('All database accounts and payments cleared', 'success');
       } catch (err) {
-        alert('Clear failed: ' + err.message);
+        await showAlert({ title: 'Clear Failed', message: 'Clear failed: ' + err.message, type: 'danger' });
       } finally {
         setIsDataActionLoading(false);
       }

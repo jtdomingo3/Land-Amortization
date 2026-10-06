@@ -20,7 +20,7 @@ import {
 import { useApp } from '../context/AppContext.jsx';
 
 export function HelpPage() {
-  const { setActiveTab } = useApp();
+  const { setActiveTab, showToast } = useApp();
   const [activeSection, setActiveSection] = useState('all');
 
   const sections = [
@@ -368,7 +368,7 @@ export function HelpPage() {
           className="btn btn-secondary btn-sm"
           onClick={() => {
             localStorage.removeItem('land_amortization_hide_welcome');
-            alert('Welcome popup will appear the next time the app starts.');
+            showToast('Welcome popup will appear the next time the app starts.', 'info');
           }}
         >
           Reset Welcome Popup

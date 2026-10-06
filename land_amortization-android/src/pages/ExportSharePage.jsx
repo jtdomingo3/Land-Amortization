@@ -36,6 +36,8 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus, lastSyncedAt })
     clearAll,
     setActiveTab,
     syncCloud,
+    showConfirm,
+    showToast,
     isSyncing: appIsSyncing,
     syncStatus: appSyncStatus,
     lastSyncedAt: appLastSyncedAt
@@ -98,15 +100,32 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus, lastSyncedAt })
   };
 
   const handleReset = async () => {
-    if (confirm('Reset database back to the Excel sample accounts (Juan Dela Cruz, Pedro Santos)? Any newly added accounts will be replaced.')) {
+    const confirmed = await showConfirm({
+      title: 'Reset to Sample Data?',
+      message: 'Reset database back to Excel sample accounts (Juan Dela Cruz, Pedro Santos)? Any newly added accounts will be replaced.',
+      details: 'This will re-initialize the sample buyer records in your local database.',
+      confirmText: 'Reset Sample Data',
+      type: 'warning'
+    });
+    if (confirmed) {
       await resetSample();
+      showToast('Reset to sample data successfully', 'success');
       setSuccessMessage('Reset to sample data successfully.');
     }
   };
 
   const handleClear = async () => {
-    if (confirm('CAUTION: Are you sure you want to clear all accounts and payments? This cannot be undone.')) {
+    const confirmed = await showConfirm({
+      title: 'Clear All Accounts & Payments?',
+      message: 'CAUTION: Are you sure you want to clear all accounts and payments? This cannot be undone.',
+      details: 'All accounts, amortization logs, and payments will be permanently wiped.',
+      confirmText: 'Delete All Data',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (confirmed) {
       await clearAll();
+      showToast('All data cleared', 'success');
       setSuccessMessage('All data cleared.');
     }
   };

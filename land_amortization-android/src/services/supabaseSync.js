@@ -255,16 +255,18 @@ CREATE POLICY "Allow all operations for land_penalties" ON land_penalties FOR AL
  */
 async function safeUpsertAccounts(client, accountsList) {
   if (!accountsList || accountsList.length === 0) return;
+  const validList = accountsList.filter(a => a && a.account_id);
+  if (validList.length === 0) return;
 
-  const { error } = await client.from('land_accounts').upsert(accountsList, { onConflict: 'account_id' });
+  const { error } = await client.from('land_accounts').upsert(validList, { onConflict: 'account_id' });
   if (!error) return;
 
   const errMsg = (error.message || '').toLowerCase();
   const isSchemaMismatch = errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist');
 
   if (isSchemaMismatch) {
-    console.warn('[Cloud Sync] Note: Remote land_accounts missing columns (' + error.message + '). Retrying without is_dp_paid...');
-    const legacyAccs = accountsList.map(a => {
+    console.log('[Cloud Sync] Note: Remote land_accounts missing columns (' + error.message + '). Retrying without is_dp_paid...');
+    const legacyAccs = validList.map(a => {
       const { is_dp_paid, ...rest } = a;
       return rest;
     });
@@ -285,18 +287,20 @@ async function safeUpsertAccounts(client, accountsList) {
  */
 async function safeUpsertPayments(client, paymentsList) {
   if (!paymentsList || paymentsList.length === 0) return;
+  const validList = paymentsList.filter(p => p && p.payment_id);
+  if (validList.length === 0) return;
 
-  const { error } = await client.from('land_payments').upsert(paymentsList, { onConflict: 'payment_id' });
+  const { error } = await client.from('land_payments').upsert(validList, { onConflict: 'payment_id' });
   if (!error) return;
 
   const errMsg = (error.message || '').toLowerCase();
   const isSchemaMismatch = errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist');
 
   if (isSchemaMismatch) {
-    console.warn('[Cloud Sync] Note: Remote land_payments missing columns (' + error.message + '). Retrying with legacy columns...');
+    console.log('[Cloud Sync] Note: Remote land_payments missing columns (' + error.message + '). Retrying with legacy columns...');
     
     // First try legacy columns (with month_covered)
-    let legacyPays = paymentsList.map(p => {
+    let legacyPays = validList.map(p => {
       const { amortization_amount, penalty_amount, for_month_no, ...rest } = p;
       return rest;
     });
@@ -310,7 +314,7 @@ async function safeUpsertPayments(client, paymentsList) {
     // If month_covered also doesn't exist on remote table, strip that as well
     const retryErrMsg = (retryRes.error.message || '').toLowerCase();
     if (retryErrMsg.includes('column') || retryErrMsg.includes('schema cache') || retryErrMsg.includes('does not exist')) {
-      legacyPays = paymentsList.map(p => {
+      legacyPays = validList.map(p => {
         const { amortization_amount, penalty_amount, for_month_no, month_covered, ...coreOnly } = p;
         return coreOnly;
       });
@@ -396,8 +400,9 @@ export async function syncWithSupabase() {
     }
 
     // 4. Push local payments to cloud (upsert)
-    if (localPayments.length > 0) {
-      const cleanPays = localPayments.map(p => ({
+    const validLocalPayments = localPayments.filter(p => p && p.payment_id);
+    if (validLocalPayments.length > 0) {
+      const cleanPays = validLocalPayments.map(p => ({
         payment_id: p.payment_id,
         account_id: p.account_id,
         payment_date: p.payment_date,
@@ -472,6 +477,7 @@ export async function syncWithSupabase() {
  * Automatically sync a created/updated account to Supabase if online
  */
 export async function syncUpsertAccount(account) {
+  if (!account || !account.account_id) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const client = getSupabaseClient();
   if (!client) return;
@@ -509,7 +515,7 @@ export async function syncUpsertAccount(account) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-synced account to Supabase:', account.account_id);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-sync account deferred:', err.message);
+    console.log('[Cloud Sync] Auto-sync account deferred:', err.message);
   }
 }
 
@@ -530,7 +536,7 @@ export async function syncDeleteAccount(accountId) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-deleted account and payments from Supabase:', accountId);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-delete account deferred:', err.message);
+    console.log('[Cloud Sync] Auto-delete account deferred:', err.message);
   }
 }
 
@@ -538,6 +544,7 @@ export async function syncDeleteAccount(accountId) {
  * Automatically sync a created/updated payment to Supabase if online
  */
 export async function syncUpsertPayment(payment) {
+  if (!payment || !payment.payment_id) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const client = getSupabaseClient();
   if (!client) return;
@@ -578,7 +585,7 @@ export async function syncUpsertPayment(payment) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-synced payment to Supabase:', payment.payment_id);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-sync payment deferred:', err.message);
+    console.log('[Cloud Sync] Auto-sync payment deferred:', err.message);
   }
 }
 
@@ -597,7 +604,7 @@ export async function syncDeletePayment(paymentId) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-deleted payment from Supabase:', paymentId);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-delete payment deferred:', err.message);
+    console.log('[Cloud Sync] Auto-delete payment deferred:', err.message);
   }
 }
 
@@ -605,6 +612,7 @@ export async function syncDeletePayment(paymentId) {
  * Automatically sync a created/updated penalty to Supabase if online
  */
 export async function syncUpsertPenalty(penalty) {
+  if (!penalty || !penalty.penalty_id) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const client = getSupabaseClient();
   if (!client) return;
@@ -629,7 +637,7 @@ export async function syncUpsertPenalty(penalty) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-synced penalty to Supabase:', penalty.penalty_id);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-sync penalty deferred (optional table):', err.message);
+    console.log('[Cloud Sync] Auto-sync penalty deferred (optional table):', err.message);
   }
 }
 
@@ -648,7 +656,7 @@ export async function syncDeletePenalty(penaltyId) {
     try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
     console.log('[Cloud Sync] Auto-deleted penalty from Supabase:', penaltyId);
   } catch (err) {
-    console.warn('[Cloud Sync] Auto-delete penalty deferred:', err.message);
+    console.log('[Cloud Sync] Auto-delete penalty deferred:', err.message);
   }
 }
 

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export function AccountsPage() {
-  const { accounts, addAccount, resetSample, deleteAccount } = useApp();
+  const { accounts, addAccount, resetSample, deleteAccount, showConfirm, showToast } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('id-asc');
@@ -74,9 +74,17 @@ export function AccountsPage() {
 
   const handleDeleteAccount = async (account, e) => {
     if (e) e.stopPropagation();
-    const confirmText = `Are you sure you want to permanently delete Account #${account.account_id} (${account.name})?\n\nAll associated payments and records will be deleted locally and in the Supabase cloud database.`;
-    if (window.confirm(confirmText)) {
+    const confirmed = await showConfirm({
+      title: `Delete Account #${account.account_id}?`,
+      message: `Are you sure you want to permanently delete ${account.name}'s account record?`,
+      details: 'All associated amortization payments and ledger records will be deleted locally and in the cloud database.',
+      confirmText: 'Delete Account',
+      cancelText: 'Keep Account',
+      type: 'danger'
+    });
+    if (confirmed) {
       await deleteAccount(account.account_id);
+      showToast(`Account #${account.account_id} (${account.name}) deleted successfully`, 'success');
     }
   };
 

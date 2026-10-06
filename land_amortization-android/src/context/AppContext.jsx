@@ -34,6 +34,9 @@ import {
   syncDeletePenalty
 } from '../services/supabaseSync.js';
 
+import { ConfirmDialog } from '../components/ConfirmDialog.jsx';
+import { ToastContainer } from '../components/Toast.jsx';
+
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
@@ -72,7 +75,63 @@ export function AppProvider({ children }) {
   const [accounts, setAccounts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [dashboard, setDashboard] = useState({});
-  const [exportLogs, setExportLogs] = useState([]);
+  const [dialogConfig, setDialogConfig] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  const showConfirm = useCallback((options) => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        ...options,
+        isOpen: true,
+        isAlert: false,
+        onConfirm: () => {
+          setDialogConfig(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setDialogConfig(null);
+          resolve(false);
+        }
+      });
+    });
+  }, []);
+
+  const showAlert = useCallback((options) => {
+    const opts = typeof options === 'string' ? { message: options } : options;
+    return new Promise((resolve) => {
+      setDialogConfig({
+        title: 'Notice',
+        type: 'info',
+        ...opts,
+        isOpen: true,
+        isAlert: true,
+        confirmText: opts?.confirmText || 'Understood',
+        onConfirm: () => {
+          setDialogConfig(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setDialogConfig(null);
+          resolve(true);
+        }
+      });
+    });
+  }, []);
+
+  const showToast = useCallback((message, type = 'info', duration = 3500) => {
+    const id = Date.now() + Math.random().toString(36).substring(2, 6);
+    setToasts(prev => [...prev, { id, message, type }]);
+
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, duration);
+    }
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -242,8 +301,10 @@ export function AppProvider({ children }) {
         payment_method: 'Cash',
         remarks: 'Initial Down Payment'
       };
-      await insertPayment(dpPayment);
-      syncUpsertPayment(dpPayment);
+      const createdDp = await insertPayment(dpPayment);
+      if (createdDp && createdDp.payment_id) {
+        syncUpsertPayment(createdDp);
+      }
     }
 
     await refreshData();
@@ -265,8 +326,10 @@ export function AppProvider({ children }) {
   };
 
   const handleAddPayment = async (paymentData) => {
-    await insertPayment(paymentData);
-    syncUpsertPayment(paymentData);
+    const createdPayment = await insertPayment(paymentData);
+    if (createdPayment && createdPayment.payment_id) {
+      syncUpsertPayment(createdPayment);
+    }
 
     // If payment is a Down Payment, recompute and reduce monthly amortization on the account
     if (paymentData.payment_type === 'Down Payment') {
@@ -442,10 +505,19 @@ export function AppProvider({ children }) {
     exportExcel: handleExportExcel,
     shareDrive: handleShareDrive,
     resetSample: handleResetSample,
-    clearAll: handleClearAll
+    clearAll: handleClearAll,
+    showConfirm,
+    showAlert,
+    showToast
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      {dialogConfig && <ConfirmDialog {...dialogConfig} />}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {
