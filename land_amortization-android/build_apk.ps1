@@ -32,10 +32,17 @@ Write-Host "[1/4] Building web assets with Vite..." -ForegroundColor Yellow
 npm run build
 
 Write-Host "`n[2/4] Syncing Cordova platform assets..." -ForegroundColor Yellow
-npx cordova prepare android
+try {
+    npx cordova prepare android
+} catch {
+    Write-Warning "Cordova CLI prepare skipped or partial, copying assets directly."
+}
+if (Test-Path ".\platforms\android\app\src\main\assets\www") {
+    Copy-Item -Path ".\www\*" -Destination ".\platforms\android\app\src\main\assets\www\" -Recurse -Force
+}
 
 Write-Host "`n[3/4] Compiling debug APK via Gradle..." -ForegroundColor Yellow
-& ".\platforms\android\gradlew.bat" -b ".\platforms\android\build.gradle" cdvBuildDebug
+& ".\platforms\android\gradlew.bat" -b ".\platforms\android\build.gradle" assembleDebug
 
 Write-Host "`n[4/4] Copying APK to LandAmortization-v1.0.0.apk..." -ForegroundColor Yellow
 $srcApk = ".\platforms\android\app\build\outputs\apk\debug\app-debug.apk"
