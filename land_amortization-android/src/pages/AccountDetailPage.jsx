@@ -160,10 +160,6 @@ export function AccountDetailPage({ accountId, onBack }) {
             <Edit2 size={14} />
             <span>Edit</span>
           </button>
-          <button className="btn btn-danger btn-sm" onClick={handleDeleteAccount} title="Delete Customer Account">
-            <Trash2 size={14} />
-            <span>Delete</span>
-          </button>
         </div>
       </div>
 
@@ -514,15 +510,6 @@ export function AccountDetailPage({ accountId, onBack }) {
                     >
                       <Edit2 size={13} />
                     </button>
-
-                    <button
-                      className="btn btn-danger btn-xs action-icon-btn"
-                      style={{ padding: '5px 7px' }}
-                      onClick={() => handleDeletePayment(p)}
-                      title="Delete Payment (Syncs to Supabase)"
-                    >
-                      <Trash2 size={13} />
-                    </button>
                   </div>
                 </div>
               );
@@ -531,36 +518,7 @@ export function AccountDetailPage({ accountId, onBack }) {
         )}
       </div>
 
-      {/* Customer Record Danger / Management Card */}
-      <div style={{
-        background: 'rgba(244, 63, 94, 0.05)',
-        border: '1px solid rgba(244, 63, 94, 0.25)',
-        borderRadius: 8,
-        padding: '14px',
-        marginTop: 18,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12
-      }}>
-        <div>
-          <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--accent-rose)' }}>
-            Delete Customer Record
-          </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-            Permanently remove {account.name} and all related payment transactions. Deletions automatically sync to Supabase database.
-          </div>
-        </div>
-
-        <button
-          className="btn btn-danger btn-sm"
-          style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
-          onClick={handleDeleteAccount}
-        >
-          <Trash2 size={14} />
-          <span>Delete Customer</span>
-        </button>
-      </div>
+      {/* Customer Record Danger / Management Card Removed for Mobile */}
 
       {/* Edit Account Modal */}
       <AccountFormModal

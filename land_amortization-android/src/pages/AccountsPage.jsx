@@ -214,14 +214,6 @@ export function AccountsPage() {
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                     <StatusBadge status={account.status} />
-                    <button
-                      className="btn btn-danger btn-xs action-icon-btn"
-                      style={{ padding: '4px 6px', opacity: 0.85, flexShrink: 0 }}
-                      onClick={(e) => handleDeleteAccount(account, e)}
-                      title="Delete Customer Account"
-                    >
-                      <Trash2 size={13} />
-                    </button>
                   </div>
                 </div>
 

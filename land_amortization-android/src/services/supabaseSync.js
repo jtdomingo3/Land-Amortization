@@ -10,7 +10,10 @@ import {
   insertPenalty,
   getDeletedRecords,
   pruneDeletedRecords,
-  clearDeletedRecords
+  clearDeletedRecords,
+  deleteAccount,
+  deletePayment,
+  deletePenalty
 } from '../db/database.js';
 
 const SUPABASE_CONFIG_STORAGE_KEY = 'land_amortization_supabase_config';
@@ -394,69 +397,13 @@ export async function syncWithSupabase() {
       }
     } catch (_) {}
 
-    // 3. Handle pending deletions (offline tombstones)
-    // SAFETY GUARD: If local database has 0 accounts (e.g. freshly cleared app or fresh install),
-    // never execute cloud deletions! A clean app's purpose is to download cloud data.
-    const { rawAccs = [], rawPays = [] } = getDeletedRecords();
-    const syncedDeletedAccs = [];
-    const syncedDeletedPays = [];
+    // 3. Ignore local tombstones. Do NOT delete anything from the remote server through batch sync.
+    const activeRemoteAccounts = remoteAccounts || [];
+    const activeRemotePayments = remotePayments || [];
 
-    if (localAccounts.length === 0) {
-      if (typeof clearDeletedRecords === 'function') {
-        clearDeletedRecords();
-      }
-    } else {
-      for (const item of rawAccs) {
-        if (!item || typeof item !== 'object' || !item.id || !item.deleted_at) continue;
-        const dAccId = String(item.id);
-        const delTime = new Date(item.deleted_at).getTime();
-
-        const rem = (remoteAccounts || []).find(ra => String(ra.account_id) === dAccId);
-        if (rem) {
-          const remTime = new Date(rem.updated_at || rem.created_at || 0).getTime();
-          if (remTime > delTime) {
-            continue;
-          }
-        }
-
-        try {
-          await client.from('land_payments').delete().eq('account_id', dAccId);
-          await client.from('land_penalties').delete().eq('account_id', dAccId);
-          await client.from('land_accounts').delete().eq('account_id', dAccId);
-          syncedDeletedAccs.push(dAccId);
-        } catch (_) {}
-      }
-
-      for (const item of rawPays) {
-        if (!item || typeof item !== 'object' || !item.id || !item.deleted_at) continue;
-        const dPayId = String(item.id);
-        const delTime = new Date(item.deleted_at).getTime();
-
-        const remP = (remotePayments || []).find(rp => String(rp.payment_id) === dPayId);
-        if (remP) {
-          const remTime = new Date(remP.updated_at || remP.created_at || 0).getTime();
-          if (remTime > delTime) continue;
-        }
-
-        try {
-          await client.from('land_payments').delete().eq('payment_id', dPayId);
-          syncedDeletedPays.push(dPayId);
-        } catch (_) {}
-      }
-
-      if (typeof pruneDeletedRecords === 'function') {
-        pruneDeletedRecords(syncedDeletedAccs, syncedDeletedPays);
-      }
-    }
-
-    // Filter remote accounts/payments that were just deleted
-    const activeRemoteAccounts = (remoteAccounts || []).filter(
-      ra => !syncedDeletedAccs.some(id => String(id) === String(ra.account_id))
-    );
-    const activeRemotePayments = (remotePayments || []).filter(
-      rp => !syncedDeletedPays.some(id => String(id) === String(rp.payment_id)) &&
-            !syncedDeletedAccs.some(id => String(id) === String(rp.account_id))
-    );
+    // Optional error logging for mismatches
+    const syncErrors = [];
+    const lastSyncedAtTime = config.lastSyncedAt ? new Date(config.lastSyncedAt).getTime() : 0;
 
     // 4. Two-Way Account Reconciliation
     const localAccMap = new Map((localAccounts || []).map(a => [String(a.account_id), a]));
@@ -487,10 +434,20 @@ export async function syncWithSupabase() {
       }
     }
 
-    // Accounts only on local -> push to remote
+    // Accounts only on local -> Push if new, Drop if deleted from server
     for (const locAcc of (localAccounts || [])) {
       if (!remoteAccMap.has(String(locAcc.account_id))) {
-        accountsToPush.push(locAcc);
+        const locCreatedAt = new Date(locAcc.created_at || locAcc.updated_at || 0).getTime();
+        if (lastSyncedAtTime > 0 && locCreatedAt < lastSyncedAtTime - 5000) {
+          console.log('[Cloud Sync] Dropping orphaned local account (deleted on remote):', locAcc.account_id);
+          try {
+            if (typeof deleteAccount === 'function') await deleteAccount(locAcc.account_id);
+          } catch (e) {
+            syncErrors.push({ type: 'account_drop_error', id: locAcc.account_id, message: e.message });
+          }
+        } else {
+          accountsToPush.push(locAcc);
+        }
       }
     }
 
@@ -551,10 +508,20 @@ export async function syncWithSupabase() {
       }
     }
 
-    // Payments only on local -> push to remote
+    // Payments only on local -> Push if new, Drop if deleted from server
     for (const locPay of (localPayments || [])) {
       if (locPay && locPay.payment_id && !remotePayMap.has(String(locPay.payment_id))) {
-        paymentsToPush.push(locPay);
+        const locCreatedAt = new Date(locPay.created_at || locPay.updated_at || 0).getTime();
+        if (lastSyncedAtTime > 0 && locCreatedAt < lastSyncedAtTime - 5000) {
+          console.log('[Cloud Sync] Dropping orphaned local payment (deleted on remote):', locPay.payment_id);
+          try {
+             if (typeof deletePayment === 'function') await deletePayment(locPay.payment_id);
+          } catch (e) {
+             syncErrors.push({ type: 'payment_drop_error', id: locPay.payment_id, message: e.message });
+          }
+        } else {
+          paymentsToPush.push(locPay);
+        }
       }
     }
 
@@ -593,7 +560,16 @@ export async function syncWithSupabase() {
         }
         for (const locPen of (localPenalties || [])) {
           if (locPen && locPen.penalty_id && !remotePenMap.has(String(locPen.penalty_id))) {
-            pensToPush.push(locPen);
+            const locCreatedAt = new Date(locPen.created_at || 0).getTime();
+            if (lastSyncedAtTime > 0 && locCreatedAt < lastSyncedAtTime - 5000) {
+              try {
+                if (typeof deletePenalty === 'function') await deletePenalty(locPen.penalty_id);
+              } catch (e) {
+                syncErrors.push({ type: 'penalty_drop_error', id: locPen.penalty_id, message: e.message });
+              }
+            } else {
+              pensToPush.push(locPen);
+            }
           }
         }
         if (pensToPush.length > 0) {
@@ -604,6 +580,12 @@ export async function syncWithSupabase() {
       } catch (penSyncErr) {
         console.warn('[Cloud Sync] Note on penalty reconciliation:', penSyncErr.message);
       }
+    }
+
+    if (syncErrors.length > 0) {
+      try {
+        localStorage.setItem('land_amortization_sync_errors', JSON.stringify(syncErrors));
+      } catch (_) {}
     }
 
     const now = new Date().toISOString();
@@ -685,21 +667,8 @@ export async function syncUpsertAccount(account) {
  * Automatically delete an account from Supabase if online
  */
 export async function syncDeleteAccount(accountId) {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  try {
-    try { await client.from('land_payments').delete().eq('account_id', accountId); } catch (_) {}
-    try { await client.from('land_penalties').delete().eq('account_id', accountId); } catch (_) {}
-    await client.from('land_accounts').delete().eq('account_id', accountId);
-    const now = new Date().toISOString();
-    saveSupabaseConfig({ lastSyncedAt: now });
-    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
-    console.log('[Cloud Sync] Auto-deleted account and payments from Supabase:', accountId);
-  } catch (err) {
-    console.log('[Cloud Sync] Auto-delete account deferred:', err.message);
-  }
+  // Mobile platform cannot delete from cloud server
+  console.log('[Cloud Sync] Mobile cannot delete account from cloud:', accountId);
 }
 
 /**
@@ -755,19 +724,8 @@ export async function syncUpsertPayment(payment) {
  * Automatically delete a payment from Supabase if online
  */
 export async function syncDeletePayment(paymentId) {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  try {
-    await client.from('land_payments').delete().eq('payment_id', paymentId);
-    const now = new Date().toISOString();
-    saveSupabaseConfig({ lastSyncedAt: now });
-    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
-    console.log('[Cloud Sync] Auto-deleted payment from Supabase:', paymentId);
-  } catch (err) {
-    console.log('[Cloud Sync] Auto-delete payment deferred:', err.message);
-  }
+  // Mobile platform cannot delete from cloud server
+  console.log('[Cloud Sync] Mobile cannot delete payment from cloud:', paymentId);
 }
 
 /**
@@ -807,18 +765,7 @@ export async function syncUpsertPenalty(penalty) {
  * Automatically delete a penalty from Supabase if online
  */
 export async function syncDeletePenalty(penaltyId) {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  try {
-    await client.from('land_penalties').delete().eq('penalty_id', penaltyId);
-    const now = new Date().toISOString();
-    saveSupabaseConfig({ lastSyncedAt: now });
-    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
-    console.log('[Cloud Sync] Auto-deleted penalty from Supabase:', penaltyId);
-  } catch (err) {
-    console.log('[Cloud Sync] Auto-delete penalty deferred:', err.message);
-  }
+  // Mobile platform cannot delete from cloud server
+  console.log('[Cloud Sync] Mobile cannot delete penalty from cloud:', penaltyId);
 }
 

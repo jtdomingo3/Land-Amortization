@@ -556,14 +556,10 @@ export function ExportSharePage({ onSync, isSyncing, syncStatus, lastSyncedAt })
           Database Tools
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
           <button className="btn btn-secondary btn-sm" onClick={handleReset}>
             <RotateCcw size={14} />
             Reset to Sample Data
-          </button>
-          <button className="btn btn-danger btn-sm" onClick={handleClear}>
-            <Trash2 size={14} />
-            Clear All Data
           </button>
         </div>
       </div>

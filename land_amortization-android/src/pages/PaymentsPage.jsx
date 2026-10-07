@@ -248,14 +248,6 @@ export function PaymentsPage() {
                   >
                     <Edit2 size={12} />
                   </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                    onClick={() => handleDelete(p)}
-                    title="Delete Payment"
-                  >
-                    <Trash2 size={12} />
-                  </button>
                 </div>
               </div>
 

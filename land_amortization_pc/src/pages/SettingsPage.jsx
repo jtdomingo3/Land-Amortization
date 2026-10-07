@@ -770,7 +770,7 @@ export function SettingsPage() {
           Manage local SQLite accounts and payment records on this device.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -780,17 +780,6 @@ export function SettingsPage() {
           >
             <RotateCcw size={14} />
             <span>Reset Demo Data</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-danger btn-sm"
-            onClick={handleClearAllData}
-            disabled={isDataActionLoading}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          >
-            <Trash2 size={14} />
-            <span>Clear All Data</span>
           </button>
         </div>
 
