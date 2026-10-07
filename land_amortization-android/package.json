@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:desktop": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "build:apk": "powershell -ExecutionPolicy Bypass -File ./build_apk.ps1",

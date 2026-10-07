@@ -23,10 +23,23 @@ try {
 let mainWindow = null;
 let db = null;
 
+function getDatabasePath() {
+  const primaryPath = path.join(app.getPath('userData'), 'land_amortization.db');
+  if (!fs.existsSync(primaryPath)) {
+    try {
+      const appData = app.getPath('appData');
+      const alt1 = path.join(appData, 'Land Amortization Tracker', 'land_amortization.db');
+      const alt2 = path.join(appData, 'land_amortization_pc', 'land_amortization.db');
+      if (fs.existsSync(alt1)) return alt1;
+      if (fs.existsSync(alt2)) return alt2;
+    } catch (_) {}
+  }
+  return primaryPath;
+}
+
 function initSQLite() {
   try {
-    const userDataPath = app.getPath('userData');
-    const dbPath = path.join(userDataPath, 'land_amortization.db');
+    const dbPath = getDatabasePath();
     console.log('[SQLite] Database path:', dbPath);
 
     db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'development' ? console.log : null });
@@ -62,11 +75,32 @@ function initSQLite() {
         receipt_no     TEXT,
         payment_method TEXT DEFAULT 'Cash',
         remarks        TEXT,
+        month_covered  TEXT,
+        for_month_no   INTEGER,
+        amortization_amount REAL DEFAULT 0,
+        penalty_amount      REAL DEFAULT 0,
         created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
       );
 
       CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(account_id, payment_type);
+
+      CREATE TABLE IF NOT EXISTS penalties (
+        penalty_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id     INTEGER NOT NULL,
+        penalty_type   TEXT NOT NULL DEFAULT '10% Late Penalty',
+        month_no       INTEGER,
+        month_covered  TEXT,
+        amount         REAL NOT NULL,
+        assessed_date  TEXT NOT NULL,
+        status         TEXT DEFAULT 'UNPAID',
+        amount_paid    REAL DEFAULT 0,
+        remarks        TEXT,
+        created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_penalties_account ON penalties(account_id, status);
 
       CREATE TABLE IF NOT EXISTS app_settings (
         key   TEXT PRIMARY KEY,
@@ -89,24 +123,31 @@ function initSQLite() {
     try { db.exec('ALTER TABLE payments ADD COLUMN for_month_no INTEGER;'); } catch (_) {}
     try { db.exec('ALTER TABLE payments ADD COLUMN amortization_amount REAL DEFAULT 0;'); } catch (_) {}
     try { db.exec('ALTER TABLE payments ADD COLUMN penalty_amount REAL DEFAULT 0;'); } catch (_) {}
+
     try {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS penalties (
-          penalty_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-          account_id     INTEGER NOT NULL,
-          month_no       INTEGER NOT NULL,
-          month_name     TEXT,
-          due_date       TEXT,
-          penalty_amount REAL NOT NULL,
-          penalty_reason TEXT,
-          status         TEXT NOT NULL DEFAULT 'UNPAID',
-          paid_amount    REAL DEFAULT 0,
-          waived_amount  REAL DEFAULT 0,
-          created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (account_id) REFERENCES land_accounts(account_id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS idx_penalties_account ON penalties(account_id, status);
-      `);
+      const penCols = db.prepare('PRAGMA table_info(penalties);').all();
+      const penColNames = new Set((penCols || []).map(c => c.name));
+      if (penColNames.has('penalty_amount') && !penColNames.has('amount')) {
+        db.exec('ALTER TABLE penalties ADD COLUMN amount REAL DEFAULT 0;');
+        db.exec('UPDATE penalties SET amount = penalty_amount WHERE amount = 0;');
+      }
+      if (penColNames.has('paid_amount') && !penColNames.has('amount_paid')) {
+        db.exec('ALTER TABLE penalties ADD COLUMN amount_paid REAL DEFAULT 0;');
+        db.exec('UPDATE penalties SET amount_paid = paid_amount WHERE amount_paid = 0;');
+      }
+      if (penColNames.has('due_date') && !penColNames.has('assessed_date')) {
+        db.exec('ALTER TABLE penalties ADD COLUMN assessed_date TEXT DEFAULT CURRENT_TIMESTAMP;');
+        db.exec('UPDATE penalties SET assessed_date = due_date WHERE assessed_date IS NULL;');
+      }
+      if (!penColNames.has('penalty_type')) {
+        db.exec("ALTER TABLE penalties ADD COLUMN penalty_type TEXT DEFAULT '10% Late Penalty';");
+      }
+      if (!penColNames.has('month_covered')) {
+        db.exec('ALTER TABLE penalties ADD COLUMN month_covered TEXT;');
+      }
+      if (!penColNames.has('remarks')) {
+        db.exec('ALTER TABLE penalties ADD COLUMN remarks TEXT;');
+      }
     } catch (_) {}
 
     // Auto-migrate legacy payment types 'Installment' to 'Monthly Amortization'

@@ -9,8 +9,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:desktop": "vite",
     "build": "vite build",
-    "start": "electron .",
+    "start": "vite build && electron .",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node --test test/*.test.js",

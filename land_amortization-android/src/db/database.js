@@ -151,8 +151,9 @@ const TOMBSTONE_KEYS = {
 export function recordDeletedAccount(accountId) {
   try {
     const list = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]');
-    if (!list.includes(String(accountId))) {
-      list.push(String(accountId));
+    const strId = String(accountId);
+    if (!list.some(item => (typeof item === 'object' && item ? String(item.id) : String(item)) === strId)) {
+      list.push({ id: strId, deleted_at: new Date().toISOString() });
       localStorage.setItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS, JSON.stringify(list));
     }
   } catch (_) {}
@@ -161,8 +162,9 @@ export function recordDeletedAccount(accountId) {
 export function recordDeletedPayment(paymentId) {
   try {
     const list = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]');
-    if (!list.includes(String(paymentId))) {
-      list.push(String(paymentId));
+    const strId = String(paymentId);
+    if (!list.some(item => (typeof item === 'object' && item ? String(item.id) : String(item)) === strId)) {
+      list.push({ id: strId, deleted_at: new Date().toISOString() });
       localStorage.setItem(TOMBSTONE_KEYS.DELETED_PAYMENTS, JSON.stringify(list));
     }
   } catch (_) {}
@@ -170,13 +172,34 @@ export function recordDeletedPayment(paymentId) {
 
 export function getDeletedRecords() {
   try {
-    return {
-      deletedAccounts: JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]'),
-      deletedPayments: JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]')
-    };
+    const rawAccs = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]');
+    const rawPays = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]');
+    const deletedAccounts = rawAccs.map(item => (typeof item === 'object' && item && item.id ? String(item.id) : String(item)));
+    const deletedPayments = rawPays.map(item => (typeof item === 'object' && item && item.id ? String(item.id) : String(item)));
+    return { deletedAccounts, deletedPayments, rawAccs, rawPays };
   } catch (_) {
-    return { deletedAccounts: [], deletedPayments: [] };
+    return { deletedAccounts: [], deletedPayments: [], rawAccs: [], rawPays: [] };
   }
+}
+
+export function pruneDeletedRecords(syncedAccountIds = [], syncedPaymentIds = []) {
+  try {
+    const accSet = new Set(syncedAccountIds.map(String));
+    const paySet = new Set(syncedPaymentIds.map(String));
+    const rawAccs = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS) || '[]');
+    const rawPays = JSON.parse(localStorage.getItem(TOMBSTONE_KEYS.DELETED_PAYMENTS) || '[]');
+    const remAccs = rawAccs.filter(item => !accSet.has(typeof item === 'object' && item ? String(item.id) : String(item)));
+    const remPays = rawPays.filter(item => !paySet.has(typeof item === 'object' && item ? String(item.id) : String(item)));
+    localStorage.setItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS, JSON.stringify(remAccs));
+    localStorage.setItem(TOMBSTONE_KEYS.DELETED_PAYMENTS, JSON.stringify(remPays));
+  } catch (_) {}
+}
+
+export function clearDeletedRecords() {
+  try {
+    localStorage.removeItem(TOMBSTONE_KEYS.DELETED_ACCOUNTS);
+    localStorage.removeItem(TOMBSTONE_KEYS.DELETED_PAYMENTS);
+  } catch (_) {}
 }
 
 function getWebData(key, defaultVal = []) {
@@ -377,14 +400,18 @@ export async function insertAccount(acc) {
     monthly_amortization: Number(acc.monthly_amortization) || 0,
     num_of_months: Number(acc.num_of_months) || 120,
     remarks: acc.remarks || '',
-    is_dp_paid: acc.is_dp_paid ? 1 : 0
+    is_dp_paid: acc.is_dp_paid ? 1 : 0,
+    created_at: acc.created_at || new Date().toISOString(),
+    updated_at: acc.updated_at || new Date().toISOString()
   };
 
   if (isWebFallback) {
     const list = getWebData(WEB_STORAGE_KEYS.ACCOUNTS, []);
     const existingIdx = list.findIndex(a => Number(a.account_id) === account.account_id);
     if (existingIdx >= 0) {
-      throw new Error(`Account ID ${account.account_id} already exists`);
+      list[existingIdx] = { ...list[existingIdx], ...account };
+      setWebData(WEB_STORAGE_KEYS.ACCOUNTS, list);
+      return list[existingIdx];
     }
     list.push(account);
     setWebData(WEB_STORAGE_KEYS.ACCOUNTS, list);
@@ -392,20 +419,23 @@ export async function insertAccount(acc) {
   }
 
   const sql = `
-    INSERT INTO land_accounts (
+    INSERT OR REPLACE INTO land_accounts (
       account_id, name, date_of_start, first_due_date, land_title_number,
       land_area_sqm, total_contract_amount, down_payment, agreed_dp_due,
-      monthly_amortization, num_of_months, remarks, is_dp_paid
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      monthly_amortization, num_of_months, remarks, is_dp_paid, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   await runSql(sql, [
     account.account_id, account.name, account.date_of_start, account.first_due_date,
     account.land_title_number, account.land_area_sqm, account.total_contract_amount,
     account.down_payment, account.agreed_dp_due, account.monthly_amortization,
-    account.num_of_months, account.remarks, account.is_dp_paid
+    account.num_of_months, account.remarks, account.is_dp_paid,
+    account.created_at, account.updated_at
   ]);
   return account;
 }
+
+export const upsertAccount = insertAccount;
 
 export async function updateAccount(acc) {
   const account = {
@@ -421,7 +451,8 @@ export async function updateAccount(acc) {
     monthly_amortization: Number(acc.monthly_amortization) || 0,
     num_of_months: Number(acc.num_of_months) || 120,
     remarks: acc.remarks || '',
-    is_dp_paid: acc.is_dp_paid ? 1 : 0
+    is_dp_paid: acc.is_dp_paid ? 1 : 0,
+    updated_at: acc.updated_at || new Date().toISOString()
   };
 
   if (isWebFallback) {
@@ -430,21 +461,21 @@ export async function updateAccount(acc) {
     if (idx === -1) throw new Error('Account not found');
     list[idx] = { ...list[idx], ...account };
     setWebData(WEB_STORAGE_KEYS.ACCOUNTS, list);
-    return account;
+    return list[idx];
   }
 
   const sql = `
     UPDATE land_accounts SET
       name = ?, date_of_start = ?, first_due_date = ?, land_title_number = ?,
       land_area_sqm = ?, total_contract_amount = ?, down_payment = ?, agreed_dp_due = ?,
-      monthly_amortization = ?, num_of_months = ?, remarks = ?, is_dp_paid = ?, updated_at = CURRENT_TIMESTAMP
+      monthly_amortization = ?, num_of_months = ?, remarks = ?, is_dp_paid = ?, updated_at = ?
     WHERE account_id = ?
   `;
   await runSql(sql, [
     account.name, account.date_of_start, account.first_due_date, account.land_title_number,
     account.land_area_sqm, account.total_contract_amount, account.down_payment,
     account.agreed_dp_due, account.monthly_amortization, account.num_of_months,
-    account.remarks, account.is_dp_paid, account.account_id
+    account.remarks, account.is_dp_paid, account.updated_at, account.account_id
   ]);
   return account;
 }
@@ -523,35 +554,39 @@ export async function insertPayment(p) {
     month_covered: p.month_covered || '',
     for_month_no: p.for_month_no !== null && p.for_month_no !== undefined ? Number(p.for_month_no) : null,
     amortization_amount: amortAmount,
-    penalty_amount: penAmount
+    penalty_amount: penAmount,
+    created_at: p.created_at || new Date().toISOString(),
+    updated_at: p.updated_at || new Date().toISOString()
   };
-
-  if (p.payment_id) {
-    payment.payment_id = Number(p.payment_id);
-  }
 
   if (isWebFallback) {
     const list = getWebData(WEB_STORAGE_KEYS.PAYMENTS, []);
-    const nextId = payment.payment_id || (list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1);
-    const newPayment = { ...payment, payment_id: nextId };
-    list.push(newPayment);
+    const targetId = p.payment_id ? Number(p.payment_id) : (list.length > 0 ? Math.max(...list.map(item => item.payment_id || 0)) + 1 : 1);
+    const newPayment = { ...payment, payment_id: targetId };
+    const existingIdx = list.findIndex(item => Number(item.payment_id) === targetId);
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...newPayment };
+    } else {
+      list.push(newPayment);
+    }
     setWebData(WEB_STORAGE_KEYS.PAYMENTS, list);
     return newPayment;
   }
 
-  if (payment.payment_id) {
+  if (p.payment_id) {
     const sql = `
-      INSERT INTO payments (
+      INSERT OR REPLACE INTO payments (
         payment_id, account_id, payment_date, payment_type, amount_paid, receipt_no, payment_method, remarks,
-        month_covered, for_month_no, amortization_amount, penalty_amount
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        month_covered, for_month_no, amortization_amount, penalty_amount, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await runSql(sql, [
-      payment.payment_id, payment.account_id, payment.payment_date, payment.payment_type,
+      p.payment_id, payment.account_id, payment.payment_date, payment.payment_type,
       payment.amount_paid, payment.receipt_no, payment.payment_method, payment.remarks,
-      payment.month_covered, payment.for_month_no, payment.amortization_amount, payment.penalty_amount
+      payment.month_covered, payment.for_month_no, payment.amortization_amount, payment.penalty_amount,
+      payment.created_at
     ]);
-    return payment;
+    return { ...payment, payment_id: p.payment_id };
   }
 
   const sql = `
@@ -594,7 +629,8 @@ export async function updatePayment(p) {
     month_covered: p.month_covered || '',
     for_month_no: p.for_month_no !== null && p.for_month_no !== undefined ? Number(p.for_month_no) : null,
     amortization_amount: amortAmount,
-    penalty_amount: penAmount
+    penalty_amount: penAmount,
+    updated_at: p.updated_at || new Date().toISOString()
   };
 
   if (isWebFallback) {
@@ -657,20 +693,38 @@ export async function insertPenalty(p) {
     penalty_type: p.penalty_type || '10% Late Penalty',
     month_no: p.month_no ? Number(p.month_no) : null,
     month_covered: p.month_covered || '',
-    amount: Number(p.amount) || 0,
-    assessed_date: p.assessed_date || new Date().toISOString().substring(0, 10),
+    amount: Number(p.amount !== undefined ? p.amount : p.penalty_amount) || 0,
+    assessed_date: p.assessed_date || p.due_date || new Date().toISOString().substring(0, 10),
     status: p.status || 'UNPAID',
-    amount_paid: Number(p.amount_paid) || 0,
-    remarks: p.remarks || ''
+    amount_paid: Number(p.amount_paid !== undefined ? p.amount_paid : p.paid_amount) || 0,
+    remarks: p.remarks || p.penalty_reason || ''
   };
 
   if (isWebFallback) {
     const list = getWebData(WEB_STORAGE_KEYS.PENALTIES, []);
-    const nextId = list.length > 0 ? Math.max(...list.map(item => item.penalty_id || 0)) + 1 : 1;
-    const newPenalty = { ...penalty, penalty_id: nextId };
-    list.push(newPenalty);
+    const targetId = p.penalty_id ? Number(p.penalty_id) : (list.length > 0 ? Math.max(...list.map(item => item.penalty_id || 0)) + 1 : 1);
+    const newPenalty = { ...penalty, penalty_id: targetId };
+    const existingIdx = list.findIndex(item => Number(item.penalty_id) === targetId);
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...newPenalty };
+    } else {
+      list.push(newPenalty);
+    }
     setWebData(WEB_STORAGE_KEYS.PENALTIES, list);
     return newPenalty;
+  }
+
+  if (p.penalty_id) {
+    const sql = `
+      INSERT OR REPLACE INTO penalties (
+        penalty_id, account_id, penalty_type, month_no, month_covered, amount, assessed_date, status, amount_paid, remarks
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    await runSql(sql, [
+      p.penalty_id, penalty.account_id, penalty.penalty_type, penalty.month_no, penalty.month_covered,
+      penalty.amount, penalty.assessed_date, penalty.status, penalty.amount_paid, penalty.remarks
+    ]);
+    return { ...penalty, penalty_id: p.penalty_id };
   }
 
   const sql = `

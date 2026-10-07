@@ -16,7 +16,8 @@ import {
   getExportLogs,
   addExportLog,
   resetToSampleData,
-  clearAllData
+  clearAllData,
+  clearDeletedRecords
 } from '../db/database.js';
 import { computeAccountDerived, computePaymentDerived } from '../engine/calculations.js';
 import { computeDashboard } from '../engine/dashboard.js';
@@ -505,8 +506,8 @@ export function AppProvider({ children }) {
 
   const handleClearAll = async () => {
     await clearAllData();
+    clearDeletedRecords();
     await refreshData();
-    triggerAutoSync();
   };
 
   const value = {

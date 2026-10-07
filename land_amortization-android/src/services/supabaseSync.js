@@ -6,7 +6,11 @@ import {
   updateAccount,
   insertPayment,
   updatePayment,
-  getDeletedRecords
+  getPenalties,
+  insertPenalty,
+  getDeletedRecords,
+  pruneDeletedRecords,
+  clearDeletedRecords
 } from '../db/database.js';
 
 const SUPABASE_CONFIG_STORAGE_KEY = 'land_amortization_supabase_config';
@@ -334,6 +338,7 @@ async function safeUpsertPayments(client, paymentsList) {
 
 /**
  * Full Synchronize local SQLite / Web data with Supabase Cloud
+ * Bidirectional reconciliation with timestamp-based conflict resolution (Last-Write-Wins)
  */
 export async function syncWithSupabase() {
   const config = getSupabaseConfig();
@@ -356,6 +361,10 @@ export async function syncWithSupabase() {
     // 1. Fetch local records
     const localAccounts = await getAccounts();
     const localPayments = await getPayments();
+    let localPenalties = [];
+    try {
+      localPenalties = await getPenalties();
+    } catch (_) {}
 
     // 2. Fetch remote records from Supabase
     const { data: remoteAccounts, error: accErr } = await client
@@ -374,12 +383,120 @@ export async function syncWithSupabase() {
       throw new Error(`Failed to fetch cloud payments: ${payErr.message}`);
     }
 
-    let pulledAccounts = 0;
-    let pulledPayments = 0;
+    // Optional remote penalties table
+    let remotePenalties = [];
+    try {
+      const { data: remPens, error: penErr } = await client
+        .from('land_penalties')
+        .select('*');
+      if (!penErr && remPens) {
+        remotePenalties = remPens;
+      }
+    } catch (_) {}
 
-    // 3. Push local accounts to cloud (upsert)
-    if (localAccounts.length > 0) {
-      const cleanAccs = localAccounts.map(a => ({
+    // 3. Handle pending deletions (offline tombstones)
+    // SAFETY GUARD: If local database has 0 accounts (e.g. freshly cleared app or fresh install),
+    // never execute cloud deletions! A clean app's purpose is to download cloud data.
+    const { rawAccs = [], rawPays = [] } = getDeletedRecords();
+    const syncedDeletedAccs = [];
+    const syncedDeletedPays = [];
+
+    if (localAccounts.length === 0) {
+      if (typeof clearDeletedRecords === 'function') {
+        clearDeletedRecords();
+      }
+    } else {
+      for (const item of rawAccs) {
+        if (!item || typeof item !== 'object' || !item.id || !item.deleted_at) continue;
+        const dAccId = String(item.id);
+        const delTime = new Date(item.deleted_at).getTime();
+
+        const rem = (remoteAccounts || []).find(ra => String(ra.account_id) === dAccId);
+        if (rem) {
+          const remTime = new Date(rem.updated_at || rem.created_at || 0).getTime();
+          if (remTime > delTime) {
+            continue;
+          }
+        }
+
+        try {
+          await client.from('land_payments').delete().eq('account_id', dAccId);
+          await client.from('land_penalties').delete().eq('account_id', dAccId);
+          await client.from('land_accounts').delete().eq('account_id', dAccId);
+          syncedDeletedAccs.push(dAccId);
+        } catch (_) {}
+      }
+
+      for (const item of rawPays) {
+        if (!item || typeof item !== 'object' || !item.id || !item.deleted_at) continue;
+        const dPayId = String(item.id);
+        const delTime = new Date(item.deleted_at).getTime();
+
+        const remP = (remotePayments || []).find(rp => String(rp.payment_id) === dPayId);
+        if (remP) {
+          const remTime = new Date(remP.updated_at || remP.created_at || 0).getTime();
+          if (remTime > delTime) continue;
+        }
+
+        try {
+          await client.from('land_payments').delete().eq('payment_id', dPayId);
+          syncedDeletedPays.push(dPayId);
+        } catch (_) {}
+      }
+
+      if (typeof pruneDeletedRecords === 'function') {
+        pruneDeletedRecords(syncedDeletedAccs, syncedDeletedPays);
+      }
+    }
+
+    // Filter remote accounts/payments that were just deleted
+    const activeRemoteAccounts = (remoteAccounts || []).filter(
+      ra => !syncedDeletedAccs.some(id => String(id) === String(ra.account_id))
+    );
+    const activeRemotePayments = (remotePayments || []).filter(
+      rp => !syncedDeletedPays.some(id => String(id) === String(rp.payment_id)) &&
+            !syncedDeletedAccs.some(id => String(id) === String(rp.account_id))
+    );
+
+    // 4. Two-Way Account Reconciliation
+    const localAccMap = new Map((localAccounts || []).map(a => [String(a.account_id), a]));
+    const remoteAccMap = new Map(activeRemoteAccounts.map(a => [String(a.account_id), a]));
+
+    const accountsToPush = [];
+    let pulledAccountsCount = 0;
+
+    // Accounts on remote: pull to local or push local if local is newer
+    for (const remAcc of activeRemoteAccounts) {
+      const localAcc = localAccMap.get(String(remAcc.account_id));
+      if (!localAcc) {
+        // Doesn't exist locally -> Insert to local DB
+        await insertAccount(remAcc);
+        pulledAccountsCount++;
+      } else {
+        // Exists in both: compare updated_at
+        const remTime = new Date(remAcc.updated_at || 0).getTime();
+        const locTime = new Date(localAcc.updated_at || localAcc.created_at || 0).getTime();
+        if (remTime > locTime) {
+          // Remote is newer -> update local
+          await updateAccount(remAcc);
+          pulledAccountsCount++;
+        } else if (locTime > remTime) {
+          // Local is newer -> push to remote
+          accountsToPush.push(localAcc);
+        }
+      }
+    }
+
+    // Accounts only on local -> push to remote
+    for (const locAcc of (localAccounts || [])) {
+      if (!remoteAccMap.has(String(locAcc.account_id))) {
+        accountsToPush.push(locAcc);
+      }
+    }
+
+    // Push local accounts to cloud
+    if (accountsToPush.length > 0) {
+      const cleanAccs = accountsToPush.map(a => ({
         account_id: a.account_id,
         name: a.name,
         date_of_start: a.date_of_start,
@@ -393,16 +510,57 @@ export async function syncWithSupabase() {
         monthly_amortization: a.monthly_amortization,
         num_of_months: a.num_of_months,
         remarks: a.remarks || null,
-        updated_at: new Date().toISOString()
+        updated_at: a.updated_at || new Date().toISOString()
       }));
-
       await safeUpsertAccounts(client, cleanAccs);
     }
 
-    // 4. Push local payments to cloud (upsert)
-    const validLocalPayments = localPayments.filter(p => p && p.payment_id);
-    if (validLocalPayments.length > 0) {
-      const cleanPays = validLocalPayments.map(p => ({
+    // 5. Two-Way Payment Reconciliation
+    // Refresh local accounts map to ensure foreign keys are satisfied
+    const currentLocalAccounts = await getAccounts();
+    const currentLocalAccSet = new Set(currentLocalAccounts.map(a => String(a.account_id)));
+
+    const localPayMap = new Map((localPayments || []).map(p => [String(p.payment_id), p]));
+    const remotePayMap = new Map(activeRemotePayments.map(p => [String(p.payment_id), p]));
+
+    const paymentsToPush = [];
+    let pulledPaymentsCount = 0;
+
+    // Payments on remote: pull to local
+    for (const remPay of activeRemotePayments) {
+      // Ensure the payment belongs to an existing local account to avoid SQLite foreign key crashes
+      if (!currentLocalAccSet.has(String(remPay.account_id))) {
+        continue;
+      }
+
+      const localPay = localPayMap.get(String(remPay.payment_id));
+      if (!localPay) {
+        // Doesn't exist locally -> insert
+        await insertPayment(remPay);
+        pulledPaymentsCount++;
+      } else {
+        // Exists in both: compare updated_at
+        const remTime = new Date(remPay.updated_at || remPay.created_at || 0).getTime();
+        const locTime = new Date(localPay.updated_at || localPay.created_at || 0).getTime();
+        if (remTime > locTime) {
+          await updatePayment(remPay);
+          pulledPaymentsCount++;
+        } else if (locTime > remTime) {
+          paymentsToPush.push(localPay);
+        }
+      }
+    }
+
+    // Payments only on local -> push to remote
+    for (const locPay of (localPayments || [])) {
+      if (locPay && locPay.payment_id && !remotePayMap.has(String(locPay.payment_id))) {
+        paymentsToPush.push(locPay);
+      }
+    }
+
+    // Push local payments to cloud
+    if (paymentsToPush.length > 0) {
+      const cleanPays = paymentsToPush.map(p => ({
         payment_id: p.payment_id,
         account_id: p.account_id,
         payment_date: p.payment_date,
@@ -415,54 +573,58 @@ export async function syncWithSupabase() {
         for_month_no: p.for_month_no || null,
         amortization_amount: p.amortization_amount !== undefined ? p.amortization_amount : (p.payment_type === 'Penalty' ? 0 : p.amount_paid),
         penalty_amount: p.penalty_amount || (p.payment_type === 'Penalty' ? p.amount_paid : 0),
-        updated_at: new Date().toISOString()
+        updated_at: p.updated_at || new Date().toISOString()
       }));
-
       await safeUpsertPayments(client, cleanPays);
     }
 
-    // 5. Handle deleted items tombstones & prevent resurrection
-    const { deletedAccounts = [], deletedPayments = [] } = getDeletedRecords();
-    const deletedAccSet = new Set(deletedAccounts.map(String));
-    const deletedPaySet = new Set(deletedPayments.map(String));
-
-    for (const dAccId of deletedAccSet) {
+    // 6. Two-Way Penalties Reconciliation (optional table)
+    if (remotePenalties.length > 0 || (localPenalties && localPenalties.length > 0)) {
       try {
-        await client.from('land_payments').delete().eq('account_id', dAccId);
-        await client.from('land_accounts').delete().eq('account_id', dAccId);
-      } catch (_) {}
-    }
-    for (const dPayId of deletedPaySet) {
-      try {
-        await client.from('land_payments').delete().eq('payment_id', dPayId);
-      } catch (_) {}
-    }
+        const localPenMap = new Map((localPenalties || []).map(p => [String(p.penalty_id), p]));
+        const remotePenMap = new Map((remotePenalties || []).map(p => [String(p.penalty_id), p]));
+        const pensToPush = [];
 
-    // 6. Pull cloud accounts that don't exist locally and are NOT deleted
-    const localAccIds = new Set(localAccounts.map(a => String(a.account_id)));
-    for (const remAcc of (remoteAccounts || [])) {
-      if (!localAccIds.has(String(remAcc.account_id)) && !deletedAccSet.has(String(remAcc.account_id))) {
-        await insertAccount(remAcc);
-        pulledAccounts++;
-      }
-    }
-
-    // 7. Pull cloud payments that don't exist locally and are NOT deleted
-    const localPayIds = new Set(localPayments.map(p => String(p.payment_id)));
-    for (const remPay of (remotePayments || [])) {
-      if (!localPayIds.has(String(remPay.payment_id)) && !deletedPaySet.has(String(remPay.payment_id)) && !deletedAccSet.has(String(remPay.account_id))) {
-        await insertPayment(remPay);
-        pulledPayments++;
+        for (const remPen of remotePenalties) {
+          if (!currentLocalAccSet.has(String(remPen.account_id))) continue;
+          if (!localPenMap.has(String(remPen.penalty_id))) {
+            await insertPenalty(remPen);
+          }
+        }
+        for (const locPen of (localPenalties || [])) {
+          if (locPen && locPen.penalty_id && !remotePenMap.has(String(locPen.penalty_id))) {
+            pensToPush.push(locPen);
+          }
+        }
+        if (pensToPush.length > 0) {
+          for (const pen of pensToPush) {
+            await syncUpsertPenalty(pen);
+          }
+        }
+      } catch (penSyncErr) {
+        console.warn('[Cloud Sync] Note on penalty reconciliation:', penSyncErr.message);
       }
     }
 
     const now = new Date().toISOString();
     saveSupabaseConfig({ lastSyncedAt: now });
+    try { localStorage.setItem('land_amortization_last_synced', now); } catch (_) {}
+
+    const totalAccounts = (await getAccounts()).length;
+    const totalPayments = (await getPayments()).length;
 
     return {
       success: true,
-      message: `Cloud sync complete! ${localAccounts.length} accounts & ${localPayments.length} payments synced.`,
-      timestamp: now
+      message: `Cloud sync complete! ${totalAccounts} accounts & ${totalPayments} payments synchronized (${pulledAccountsCount} pulled, ${accountsToPush.length} pushed).`,
+      timestamp: now,
+      stats: {
+        totalAccounts,
+        totalPayments,
+        pulledAccounts: pulledAccountsCount,
+        pushedAccounts: accountsToPush.length,
+        pulledPayments: pulledPaymentsCount,
+        pushedPayments: paymentsToPush.length
+      }
     };
   } catch (err) {
     console.error('Supabase sync error:', err);
