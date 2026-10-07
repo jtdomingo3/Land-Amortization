@@ -187,22 +187,22 @@ export function AccountDetailPage({ accountId, onBack }) {
         </div>
 
         {/* Financial Overview Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 14 }}>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 8, marginTop: 14 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8, minWidth: 0 }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Contract</span>
-            <div style={{ fontSize: '0.98rem', fontWeight: 700, fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+            <div style={{ fontSize: 'clamp(0.78rem, 3vw, 0.96rem)', fontWeight: 700, fontFamily: 'var(--font-mono)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(account.total_contract_amount)}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8, minWidth: 0 }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Paid</span>
-            <div style={{ fontSize: '0.98rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', marginTop: 2 }}>
+            <div style={{ fontSize: 'clamp(0.78rem, 3vw, 0.96rem)', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(account.total_paid)}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8, minWidth: 0 }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</span>
-            <div style={{ fontSize: '0.98rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', marginTop: 2 }}>
+            <div style={{ fontSize: 'clamp(0.78rem, 3vw, 0.96rem)', fontWeight: 700, fontFamily: 'var(--font-mono)', color: account.outstanding_balance > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(account.outstanding_balance)}
             </div>
           </div>
@@ -317,10 +317,10 @@ export function AccountDetailPage({ accountId, onBack }) {
           Calculations & Penalties
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: '0.8rem' }}>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, fontSize: '0.8rem' }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: 8, borderRadius: 6, minWidth: 0 }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Down Payment</span>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(account.total_dp_paid ?? account.down_payment)}
             </div>
             {unpaidDp > 0 ? (

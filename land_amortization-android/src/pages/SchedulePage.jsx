@@ -77,19 +77,19 @@ export function SchedulePage() {
 
       {/* Account Summary Banner */}
       <div className="glass-card" style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 10 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
               MONTHLY WATERFALL SCHEDULE
             </span>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
               {currentAccount.name}
             </h3>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 2, flexWrap: 'wrap' }}>
               Monthly Due: <strong>{formatCurrency(currentAccount.monthly_amortization)}</strong> • Term: {currentAccount.num_of_months || 120} months
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
             <StatusBadge status={currentAccount.status} />
             <button
               type="button"
@@ -105,7 +105,7 @@ export function SchedulePage() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))',
           gap: 8,
           background: 'var(--bg-card-subtle)',
           borderRadius: 8,
@@ -113,27 +113,28 @@ export function SchedulePage() {
           marginTop: 10,
           fontSize: '0.78rem'
         }}>
-          <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Amortization Paid</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-emerald-light)' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Amortization Paid</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(0.8rem, 3.2vw, 0.95rem)', color: 'var(--accent-emerald-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(currentAccount.installments_paid)}
             </div>
           </div>
 
-          <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Consecutive Missed</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Consecutive Missed</div>
             <div style={{
               fontFamily: 'var(--font-mono)',
               fontWeight: 700,
+              fontSize: 'clamp(0.8rem, 3.2vw, 0.95rem)',
               color: currentAccount.consecutive_missed >= 2 ? 'var(--accent-rose)' : 'inherit'
             }}>
               {currentAccount.consecutive_missed || 0} mos
             </div>
           </div>
 
-          <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Next Due Date</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Next Due Date</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(0.8rem, 3.2vw, 0.95rem)', color: 'var(--accent-cyan)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatDate(currentAccount.next_due_date)}
             </div>
           </div>

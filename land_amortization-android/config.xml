@@ -19,7 +19,15 @@
     <allow-intent href="geo:*" />
     <icon src="public/logo.png" />
 
+    <feature name="NotificationPlugin">
+        <param name="android-package" value="com.landamortization.tracker.NotificationPlugin" />
+    </feature>
+
     <platform name="android">
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.VIBRATE" />
+        </config-file>
         <allow-intent href="market:*" />
         <preference name="AndroidWindowSoftInputMode" value="adjustResize" />
         <preference name="android-minSdkVersion" value="24" />

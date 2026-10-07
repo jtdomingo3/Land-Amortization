@@ -1,13 +1,15 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import logoImg from '../assets/logo.png';
-import { Share2, Sun, Moon, Cloud } from 'lucide-react';
+import { Share2, Sun, Moon, Cloud, Bell } from 'lucide-react';
+import { evaluateNotifications } from '../services/notificationService.js';
 
-export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
-  const { setActiveTab, theme, toggleTheme, syncCloud, isSyncing: appIsSyncing } = useApp();
+export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt, onOpenNotifications }) {
+  const { setActiveTab, theme, toggleTheme, syncCloud, isSyncing: appIsSyncing, accounts } = useApp();
 
   const handleSync = onSync || (() => syncCloud({ silent: false }));
   const syncing = isSyncing !== undefined ? isSyncing : appIsSyncing;
+  const { totalAlerts } = evaluateNotifications(accounts || []);
 
   return (
     <header className="app-header">
@@ -24,6 +26,42 @@ export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Notifications Alert Bell */}
+        {onOpenNotifications && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenNotifications}
+            title={totalAlerts > 0 ? `${totalAlerts} payment alerts` : 'Notifications'}
+            aria-label="Payment Notifications"
+            style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+          >
+            <Bell size={16} color={totalAlerts > 0 ? 'var(--accent-rose)' : 'var(--text-secondary)'} />
+            {totalAlerts > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  minWidth: 16,
+                  height: 16,
+                  padding: '0 4px',
+                  borderRadius: 10,
+                  background: 'var(--accent-rose)',
+                  color: '#fff',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 6px rgba(244, 63, 94, 0.6)'
+                }}
+              >
+                {totalAlerts}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Quick Cloud Sync Button */}
         <button
           className="btn btn-secondary btn-sm"
@@ -53,17 +91,6 @@ export function Header({ onSync, isSyncing, syncStatus, lastSyncedAt }) {
           ) : (
             <Moon size={17} color="#475569" />
           )}
-        </button>
-
-        {/* Quick Export Button */}
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={() => setActiveTab('export')}
-          title="Export / Share to Google Drive"
-          style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
-        >
-          <Share2 size={15} />
-          <span className="header-export-text">Export</span>
         </button>
       </div>
     </header>

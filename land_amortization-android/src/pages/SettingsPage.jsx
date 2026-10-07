@@ -30,7 +30,10 @@ import {
   EyeOff,
   Terminal,
   Copy,
-  RefreshCw
+  RefreshCw,
+  Bell,
+  BellRing,
+  BellOff
 } from 'lucide-react';
 import {
   getSupabaseConfig,
@@ -39,10 +42,19 @@ import {
   syncWithSupabase,
   SUPABASE_SQL_SCHEMA
 } from '../services/supabaseSync.js';
+import {
+  checkNotificationPermission,
+  requestNotificationPermission,
+  openSystemNotificationSettings,
+  sendLocalNotification,
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  triggerNotificationAlerts
+} from '../services/notificationService.js';
 import { formatLastSync } from '../utils/formatters.js';
 
 export function SettingsPage({ defaultOpenHelp = false }) {
-  const { resetSample, clearAll, refreshData, showConfirm, showAlert, showToast } = useApp();
+  const { resetSample, clearAll, refreshData, showConfirm, showAlert, showToast, accounts } = useApp();
 
   const [form, setForm] = useState(DEFAULT_COMPANY);
   const [loading, setLoading] = useState(true);
@@ -59,6 +71,13 @@ export function SettingsPage({ defaultOpenHelp = false }) {
   const [showSbUrl, setShowSbUrl] = useState(false);
   const [showSchema, setShowSchema] = useState(false);
   const [copiedSchema, setCopiedSchema] = useState(false);
+
+  // Notification Settings State
+  const [notifPerm, setNotifPerm] = useState({ granted: false });
+  const [notifPrefs, setNotifPrefs] = useState(getNotificationPreferences);
+  const [isTestingNotif, setIsTestingNotif] = useState(false);
+  const [isTriggeringNotif, setIsTriggeringNotif] = useState(false);
+  const [notifNotice, setNotifNotice] = useState(null);
 
   const logoInputRef = useRef(null);
   const esigInputRef = useRef(null);
@@ -242,6 +261,77 @@ export function SettingsPage({ defaultOpenHelp = false }) {
         setIsDataActionLoading(false);
       }
     }
+  };
+
+  // Notification Permission & Action Handlers
+  useEffect(() => {
+    checkNotificationPermission().then(setNotifPerm);
+  }, []);
+
+  const handleRequestNotifPermission = async () => {
+    try {
+      await requestNotificationPermission();
+      const updated = await checkNotificationPermission();
+      setNotifPerm(updated);
+      if (updated.granted) {
+        setNotifNotice({ type: 'success', message: 'Notification permission granted! Overdue payment alerts are active.' });
+      } else {
+        setNotifNotice({ type: 'warning', message: 'Permission not granted. Opening phone notification settings...' });
+        await openSystemNotificationSettings();
+      }
+    } catch (e) {
+      setNotifNotice({ type: 'error', message: 'Permission error: ' + e.message });
+    }
+    setTimeout(() => setNotifNotice(null), 5000);
+  };
+
+  const handleSendTestNotification = async () => {
+    setIsTestingNotif(true);
+    try {
+      const perm = await checkNotificationPermission();
+      if (!perm.granted) {
+        await requestNotificationPermission();
+      }
+      await sendLocalNotification({
+        id: 999,
+        title: '🔔 Test Alert: Land Amortization Tracker',
+        message: 'Phone notifications are working properly! Overdue and due payment alerts will appear here.',
+        type: 'overdue',
+        subText: 'System Test'
+      });
+      setNotifNotice({ type: 'success', message: 'Test notification sent! Check your phone notification tray.' });
+    } catch (e) {
+      setNotifNotice({ type: 'error', message: 'Failed to send notification: ' + e.message });
+    } finally {
+      setIsTestingNotif(false);
+      setTimeout(() => setNotifNotice(null), 5000);
+    }
+  };
+
+  const handleTriggerActiveAlerts = async () => {
+    setIsTriggeringNotif(true);
+    try {
+      const perm = await checkNotificationPermission();
+      if (!perm.granted) {
+        await requestNotificationPermission();
+      }
+      const res = await triggerNotificationAlerts(accounts || [], { force: true });
+      if (res.sent > 0) {
+        setNotifNotice({ type: 'success', message: `Dispatched ${res.sent} active payment alert(s) to phone status bar!` });
+      } else {
+        setNotifNotice({ type: 'info', message: 'No overdue or due accounts currently require phone alerts.' });
+      }
+    } catch (e) {
+      setNotifNotice({ type: 'error', message: 'Alert trigger error: ' + e.message });
+    } finally {
+      setIsTriggeringNotif(false);
+      setTimeout(() => setNotifNotice(null), 5000);
+    }
+  };
+
+  const handleTogglePref = (key) => {
+    const updated = saveNotificationPreferences({ [key]: !notifPrefs[key] });
+    setNotifPrefs({ ...updated });
   };
 
   if (loading) {
@@ -769,6 +859,211 @@ export function SettingsPage({ defaultOpenHelp = false }) {
             </pre>
           </div>
         )}
+      </div>
+
+      {/* 3.8 Phone Notifications & Overdue Reminders */}
+      <div className="glass-card" style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(245, 158, 11, 0.15))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-rose)',
+              flexShrink: 0
+            }}>
+              <Bell size={20} />
+            </div>
+            <div>
+              <h3 style={{
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+                margin: 0
+              }}>
+                Phone Notifications & Overdue Reminders
+              </h3>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Receive heads-up status bar alerts for overdue amortizations, 2+ missed months (10% penalty), and payments due today.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {notifPerm.granted ? (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: 'var(--accent-emerald)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                padding: '4px 10px',
+                borderRadius: 99,
+                fontSize: '0.74rem',
+                fontWeight: 700
+              }}>
+                <CheckCircle2 size={13} />
+                Access Granted
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleRequestNotifPermission}
+                style={{ fontSize: '0.75rem', padding: '6px 12px' }}
+              >
+                <BellRing size={14} />
+                Grant Phone Access
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Notice Banner */}
+        {notifNotice && (
+          <div style={{
+            padding: '10px 12px',
+            borderRadius: 8,
+            marginBottom: 12,
+            background: notifNotice.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : notifNotice.type === 'warning' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+            border: `1px solid ${notifNotice.type === 'success' ? 'var(--accent-emerald)' : notifNotice.type === 'warning' ? 'var(--accent-amber)' : 'var(--accent-rose)'}`,
+            color: notifNotice.type === 'success' ? 'var(--accent-emerald-light)' : notifNotice.type === 'warning' ? 'var(--accent-amber)' : '#fb7185',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
+          }}>
+            <Info size={15} style={{ flexShrink: 0 }} />
+            <span>{notifNotice.message}</span>
+          </div>
+        )}
+
+        {/* Notification Preferences Checklist */}
+        <div style={{
+          background: 'var(--bg-card-subtle)',
+          borderRadius: 10,
+          border: '1px solid var(--border-subtle)',
+          padding: '12px 14px',
+          marginBottom: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Enable Payment Alerts
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Allow this app to schedule and post payment reminders to your phone status bar.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={Boolean(notifPrefs.enabled)}
+              onChange={() => handleTogglePref('enabled')}
+              style={{ width: 18, height: 18, accentColor: 'var(--accent-emerald)', cursor: 'pointer' }}
+            />
+          </label>
+
+          <div style={{ height: 1, background: 'var(--border-subtle)' }} />
+
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', opacity: notifPrefs.enabled ? 1 : 0.5 }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Overdue & Delinquency Alerts
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Notifies when accounts have unpaid amortizations or 2+ consecutive missed months (10% penalty).
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              disabled={!notifPrefs.enabled}
+              checked={Boolean(notifPrefs.overdueAlerts)}
+              onChange={() => handleTogglePref('overdueAlerts')}
+              style={{ width: 17, height: 17, accentColor: 'var(--accent-rose)', cursor: 'pointer' }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', opacity: notifPrefs.enabled ? 1 : 0.5 }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Down Payment Overdue Alerts
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Notifies when agreed down payment due date passes without payment (1% contract penalty).
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              disabled={!notifPrefs.enabled}
+              checked={Boolean(notifPrefs.dpOverdueAlerts !== false)}
+              onChange={() => handleTogglePref('dpOverdueAlerts')}
+              style={{ width: 17, height: 17, accentColor: '#ea580c', cursor: 'pointer' }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', opacity: notifPrefs.enabled ? 1 : 0.5 }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Payment Due Today Alerts
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Notifies on the morning of scheduled amortization due dates.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              disabled={!notifPrefs.enabled}
+              checked={Boolean(notifPrefs.dueTodayAlerts)}
+              onChange={() => handleTogglePref('dueTodayAlerts')}
+              style={{ width: 17, height: 17, accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+            />
+          </label>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleSendTestNotification}
+            disabled={isTestingNotif}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <Bell size={14} color="var(--accent-cyan)" />
+            <span>{isTestingNotif ? 'Sending...' : 'Send Test Alert'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleTriggerActiveAlerts}
+            disabled={isTriggeringNotif}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <RefreshCw size={14} color="var(--accent-emerald)" className={isTriggeringNotif ? 'animate-spin' : ''} />
+            <span>{isTriggeringNotif ? 'Checking...' : 'Check Alerts Now'}</span>
+          </button>
+
+          {!notifPerm.granted && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={openSystemNotificationSettings}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.74rem' }}
+            >
+              <span>System Settings</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 4. Data Management Section */}

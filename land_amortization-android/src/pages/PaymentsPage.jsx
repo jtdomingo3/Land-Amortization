@@ -213,12 +213,14 @@ export function PaymentsPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 8,
                 paddingTop: 8,
                 borderTop: '1px solid var(--border-subtle)',
                 fontSize: '0.74rem',
                 color: 'var(--text-muted)'
               }}>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', minWidth: 0, flex: 1 }}>
                   <span>{formatDate(p.payment_date)}</span>
                   {p.receipt_no && <span>• OR: <strong style={{ color: 'var(--text-primary)' }}>{p.receipt_no}</strong></span>}
                   {p.month_covered && (
@@ -228,7 +230,7 @@ export function PaymentsPage() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}

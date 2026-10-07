@@ -10,6 +10,8 @@ import { ExportSharePage } from './pages/ExportSharePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { HelpPage } from './pages/HelpPage.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
+import { NotificationModal } from './components/NotificationModal.jsx';
+import { triggerNotificationAlerts } from './services/notificationService.js';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
@@ -20,8 +22,20 @@ export function App() {
     isSyncing,
     syncStatus,
     lastSyncedAt,
-    syncCloud
+    syncCloud,
+    accounts
   } = useApp();
+
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = React.useState(false);
+
+  // Auto-evaluate notification alerts for overdue/delinquent or due today buyers
+  React.useEffect(() => {
+    if (accounts && accounts.length > 0) {
+      triggerNotificationAlerts(accounts).catch(err => {
+        console.warn('Notification trigger warning:', err);
+      });
+    }
+  }, [accounts]);
 
   const handleSyncCloud = () => {
     return syncCloud({ silent: false });
@@ -84,6 +98,7 @@ export function App() {
           isSyncing={isSyncing}
           syncStatus={syncStatus}
           lastSyncedAt={lastSyncedAt}
+          onOpenNotifications={() => setIsNotificationModalOpen(true)}
         />
 
         {error && (
@@ -121,6 +136,10 @@ export function App() {
         </main>
 
         <WelcomeModal />
+        <NotificationModal
+          isOpen={isNotificationModalOpen}
+          onClose={() => setIsNotificationModalOpen(false)}
+        />
 
         <BottomNav />
       </div>

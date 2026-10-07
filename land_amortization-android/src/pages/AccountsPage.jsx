@@ -198,7 +198,7 @@ export function AccountsPage() {
           </div>
         </div>
       ) : (
-        <div className="accounts-list">
+        <div className="accounts-list" style={{ paddingBottom: 85 }}>
           {filteredAccounts.map(account => {
             const isOverdue = account.days_overdue > 0;
             return (
@@ -207,28 +207,33 @@ export function AccountsPage() {
                 className="account-card"
                 onClick={() => setViewingAccountId(account.account_id)}
               >
-                <div className="account-card-header">
-                  <div className="account-title-group">
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      ID #{account.account_id}
-                    </span>
-                    <h3>{account.name}</h3>
-                    <div className="account-subtitle">
-                      <span>Title: {account.land_title_number || 'N/A'}</span>
-                      <span>•</span>
-                      <span>{account.land_area_sqm || 0} sqm</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Top ID & Status Badge Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    ID #{account.account_id}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                     <StatusBadge status={account.status} />
                     <button
                       className="btn btn-danger btn-xs action-icon-btn"
-                      style={{ padding: '4px 6px', opacity: 0.85 }}
+                      style={{ padding: '4px 6px', opacity: 0.85, flexShrink: 0 }}
                       onClick={(e) => handleDeleteAccount(account, e)}
                       title="Delete Customer Account"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={13} />
                     </button>
+                  </div>
+                </div>
+
+                {/* Buyer Name & Land Information Row */}
+                <div style={{ marginBottom: 10 }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, wordBreak: 'break-word' }}>
+                    {account.name}
+                  </h3>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span>Title: <strong style={{ color: 'var(--text-secondary)' }}>{account.land_title_number || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>{account.land_area_sqm || 0} sqm</span>
                   </div>
                 </div>
 

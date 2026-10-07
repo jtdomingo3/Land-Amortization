@@ -68,38 +68,27 @@ export function DashboardPage() {
     <div className="dashboard-page">
       {/* Top Banner Quick Actions */}
       <div style={{
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
         gap: 8,
-        marginBottom: 16,
-        overflowX: 'auto',
-        paddingBottom: 4
+        marginBottom: 16
       }}>
         <button
           className="btn btn-primary btn-sm"
-          style={{ whiteSpace: 'nowrap' }}
+          style={{ justifyContent: 'center', padding: '9px 12px' }}
           onClick={() => setIsAccountModalOpen(true)}
         >
           <PlusCircle size={15} />
-          New Account
+          <span>New Account</span>
         </button>
 
         <button
           className="btn btn-secondary btn-sm"
-          style={{ whiteSpace: 'nowrap' }}
+          style={{ justifyContent: 'center', padding: '9px 12px' }}
           onClick={() => openPaymentModal()}
         >
           <CreditCard size={15} />
-          Record Payment
-        </button>
-
-        <button
-          className="btn btn-drive btn-sm"
-          style={{ whiteSpace: 'nowrap' }}
-          onClick={handleShareClick}
-          disabled={isSharing}
-        >
-          <CloudUpload size={15} />
-          {isSharing ? 'Sharing...' : 'Share to Drive'}
+          <span>Record Payment</span>
         </button>
       </div>
 
@@ -184,12 +173,12 @@ export function DashboardPage() {
           }} />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ minWidth: 0 }}>
             <span style={{ color: 'var(--text-muted)' }}>Collected: </span>
             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(dashboard.totalCollected)}</span>
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <span style={{ color: 'var(--text-muted)' }}>Target: </span>
             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(dashboard.totalContractAmount)}</span>
           </div>
@@ -401,27 +390,46 @@ export function DashboardPage() {
 
       {/* Penalties Summary Box */}
       <div className="glass-card" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-          Penalties Breakdown
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>DP Penalty (1%)</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+            Penalties Breakdown
+          </h3>
+          <span style={{ fontSize: '0.74rem', color: 'var(--accent-rose)', fontWeight: 700 }}>
+            {formatCurrency(dashboard.totalPenalties)} Total
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 8 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: '10px 12px', borderRadius: 8, minWidth: 0 }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>DP Penalty (1%)</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(0.82rem, 3.2vw, 0.96rem)', color: 'var(--text-primary)', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(dashboard.dpPenalties)}
             </div>
           </div>
-          <div style={{ background: 'var(--bg-card-subtle)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>10% Penalties</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginTop: 4 }}>
+          <div style={{ background: 'var(--bg-card-subtle)', padding: '10px 12px', borderRadius: 8, minWidth: 0 }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>10% Missed</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(0.82rem, 3.2vw, 0.96rem)', color: 'var(--text-primary)', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {formatCurrency(dashboard.tenPercentPenalties)}
             </div>
           </div>
-          <div style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: 10, borderRadius: 8 }}>
-            <div style={{ fontSize: '0.7rem', color: '#fb7185' }}>Total Penalties</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem', color: '#fb7185', marginTop: 4 }}>
-              {formatCurrency(dashboard.totalPenalties)}
-            </div>
+        </div>
+
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.08)',
+          border: '1px solid rgba(244, 63, 94, 0.25)',
+          padding: '10px 12px',
+          borderRadius: 8,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10
+        }}>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#fb7185', fontWeight: 700, textTransform: 'uppercase' }}>Total Applicable Penalties</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>DP + 10% missed amortizations</div>
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 'clamp(0.95rem, 3.8vw, 1.12rem)', color: '#fb7185', flexShrink: 0 }}>
+            {formatCurrency(dashboard.totalPenalties)}
           </div>
         </div>
       </div>

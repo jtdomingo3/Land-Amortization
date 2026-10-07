@@ -39,6 +39,17 @@ try {
 }
 if (Test-Path ".\platforms\android\app\src\main\assets\www") {
     Copy-Item -Path ".\www\*" -Destination ".\platforms\android\app\src\main\assets\www\" -Recurse -Force
+
+    # Ensure real Cordova Android native bridge is always preserved in APK
+    if (Test-Path ".\platforms\android\platform_www\cordova.js") {
+        Copy-Item -Path ".\platforms\android\platform_www\cordova.js" -Destination ".\platforms\android\app\src\main\assets\www\cordova.js" -Force
+    }
+    if (Test-Path ".\platforms\android\platform_www\cordova_plugins.js") {
+        Copy-Item -Path ".\platforms\android\platform_www\cordova_plugins.js" -Destination ".\platforms\android\app\src\main\assets\www\cordova_plugins.js" -Force
+    }
+    if (Test-Path ".\platforms\android\platform_www\plugins") {
+        Copy-Item -Path ".\platforms\android\platform_www\plugins\*" -Destination ".\platforms\android\app\src\main\assets\www\plugins\" -Recurse -Force
+    }
 }
 
 Write-Host "`n[3/4] Compiling debug APK via Gradle..." -ForegroundColor Yellow
